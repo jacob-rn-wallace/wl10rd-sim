@@ -38,6 +38,8 @@ wl10rd_sim/                  the package (run from the repo root: python -m wl10
   paper_data/fig12_digitized.json  paper Fig. 12 digitized from the scan, with the reading notes
 scripts/                     CLI drivers for tuning and checks (thin wrappers over wl10rd_sim.tune)
 examples/                    viewer.html + plots/ from the current tuned design (regenerate after re-tuning)
+annex/                       gitignored, local only: the owner's reference images (annex/refs/), papers, notes.
+                             Read freely; never copy its contents into tracked files or publish them.
 ```
 
 ## Setup and commands
