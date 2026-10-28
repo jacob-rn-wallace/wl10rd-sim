@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WL-10RD Workspace</title>
+<style>
+/* Motif/CDE-style workspace. Colours are GitHub Primer values arranged as Motif bevels, so it sits with GitHub in light and dark. */
+:root {
+  --desk: #424a53; --bg: #d0d7de; --hi: #f6f8fa; --lo: #6e7781; --field: #f6f8fa; --fg: #1f2328; --muted: #424a53;
+  --fa: #8250df; --fa-hi: #b392f0; --fa-lo: #512a97; --fa-fg: #ffffff;
+  --fi: #afb8c1; --fi-hi: #eaeef2; --fi-lo: #57606a; --fi-fg: #1f2328;
+  --sel: #0969da; --grid: #d0d7de; --s1: #0969da; --s2: #bc4c00; --trough: #afb8c1;
+  --led-on: #e3b341; --led-off: #6e5a1e;
+  --ph-ss: #6e7781; --ph-ss-fg: #ffffff; --ph-a: #d4a72c; --ph-a-fg: #1f2328; --ph-b: #bc4c00; --ph-b-fg: #ffffff;
+  --ph-c: #54aeff; --ph-c-fg: #1f2328; --ph-d: #0550ae; --ph-d-fg: #ffffff; --ph-st: #afb8c1; --ph-st-fg: #1f2328;
+  --vp-top: #30363d; --vp-bot: #0d1117; --floor: #161b22; --floorline: #30363d; --hud: #e6edf3; --com: #e3b341; --zmp: #f0883e;
+  --ax-x: #ff7b72; --ax-y: #3fb950; --ax-z: #58a6ff;
+  --f-ui: Helvetica, Arial, "Liberation Sans", "Noto Sans", sans-serif;
+  --f-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --desk: #010409; --bg: #21262d; --hi: #484f58; --lo: #010409; --field: #0d1117; --fg: #e6edf3; --muted: #9198a1;
+  --fa: #8957e5; --fa-hi: #bc8cff; --fa-lo: #3c1e70; --fa-fg: #ffffff;
+  --fi: #30363d; --fi-hi: #484f58; --fi-lo: #010409; --fi-fg: #e6edf3;
+  --sel: #58a6ff; --grid: #30363d; --s1: #58a6ff; --s2: #f0883e; --trough: #161b22;
+  --led-on: #e3b341; --led-off: #3b2e0a;
+  --ph-ss: #6e7781; --ph-ss-fg: #ffffff; --ph-a: #d29922; --ph-a-fg: #0d1117; --ph-b: #bd561d; --ph-b-fg: #ffffff;
+  --ph-c: #79c0ff; --ph-c-fg: #0d1117; --ph-d: #1f6feb; --ph-d-fg: #ffffff; --ph-st: #8b949e; --ph-st-fg: #0d1117;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --desk: #010409; --bg: #21262d; --hi: #484f58; --lo: #010409; --field: #0d1117; --fg: #e6edf3; --muted: #9198a1;
+  --fa: #8957e5; --fa-hi: #bc8cff; --fa-lo: #3c1e70; --fa-fg: #ffffff;
+  --fi: #30363d; --fi-hi: #484f58; --fi-lo: #010409; --fi-fg: #e6edf3;
+  --sel: #58a6ff; --grid: #30363d; --s1: #58a6ff; --s2: #f0883e; --trough: #161b22;
+  --led-on: #e3b341; --led-off: #3b2e0a;
+  --ph-ss: #6e7781; --ph-ss-fg: #ffffff; --ph-a: #d29922; --ph-a-fg: #0d1117; --ph-b: #bd561d; --ph-b-fg: #ffffff;
+  --ph-c: #79c0ff; --ph-c-fg: #0d1117; --ph-d: #1f6feb; --ph-d-fg: #ffffff; --ph-st: #8b949e; --ph-st-fg: #0d1117;
+  color-scheme: dark }
+* { box-sizing: border-box }
+html, body { margin: 0; background: var(--desk) }
+body { color: var(--fg); font-family: var(--f-ui); font-size: 13px; line-height: 1.4; min-height: 100vh; display: flex; flex-direction: column;
+  padding: 14px max(14px, env(safe-area-inset-right, 0px)) 0 max(14px, env(safe-area-inset-left, 0px)) }
+.tiles { flex: 1; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 12px; max-width: 1600px; width: 100%; margin: 0 auto }
+button, select, input { font: inherit; color: inherit }
+:focus-visible { outline: 2px solid var(--sel); outline-offset: 1px }
+.up { background: var(--bg); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi) }
+.dn { border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo) }
+.pb { background: var(--bg); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); min-height: 28px; padding: 2px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: default; white-space: nowrap }
+.pb:active, .pb[aria-pressed="true"] { border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: color-mix(in srgb, var(--bg) 82%, var(--lo)) }
+.pb.default { outline: 2px solid var(--fg); outline-offset: 1px }
+.pb.icon { width: 34px; padding: 0 }
+.pb svg { fill: currentColor }
+
+/* window frame */
+.win { --f: var(--fi); --f-hi: var(--fi-hi); --f-lo: var(--fi-lo); --f-fg: var(--fi-fg);
+  background: var(--f); border: 3px solid; border-color: var(--f-hi) var(--f-lo) var(--f-lo) var(--f-hi); padding: 2px;
+  display: flex; flex-direction: column; min-width: 0 }
+.win.active { --f: var(--fa); --f-hi: var(--fa-hi); --f-lo: var(--fa-lo); --f-fg: var(--fa-fg) }
+.win[hidden] { display: none }
+.tbar { display: flex; gap: 2px }
+.tbar > * { border: 2px solid; border-color: var(--f-hi) var(--f-lo) var(--f-lo) var(--f-hi); background: var(--f); color: var(--f-fg) }
+.tbar h2 { flex: 1; margin: 0; font-size: 13px; font-weight: bold; text-align: center; padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none }
+.wb { width: 28px; min-height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; cursor: default }
+.wb i { display: block; border: 1px solid var(--f-fg); background: var(--f-hi) }
+.client { background: var(--bg); flex: 1; display: flex; flex-direction: column; min-height: 0 }
+.pad { padding: 10px; display: flex; flex-direction: column; gap: 10px }
+.w-viewer { flex: 999 1 640px } .w-monitor { flex: 1 1 300px } .w-joints { flex: 1 1 380px } .w-strip { flex: 999 1 540px }
+.w-plan { flex: 1 1 440px } .w-phase { flex: 1 1 440px } .w-table { flex: 999 1 620px } .w-notes { flex: 1 1 420px }
+.win.max { flex: 1 1 100% }
+
+/* menus */
+.mbar { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px 4px; border-bottom: 2px solid var(--lo); box-shadow: 0 1px 0 var(--hi); position: relative }
+.mbar .help { margin-left: auto }
+.mi { background: transparent; border: 2px solid transparent; padding: 2px 9px; min-height: 26px; cursor: default }
+.mi[aria-expanded="true"] { border-color: var(--hi) var(--lo) var(--lo) var(--hi) }
+.mi u, .menu u { text-decoration: underline }
+.menu { position: absolute; z-index: 30; min-width: 220px; padding: 2px; margin: 0; list-style: none; background: var(--bg); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); box-shadow: 2px 2px 0 rgba(0,0,0,.35) }
+.menu[hidden] { display: none }
+.menu button { width: 100%; text-align: left; background: transparent; border: 2px solid transparent; padding: 4px 10px 4px 26px; min-height: 28px; display: flex; gap: 16px; justify-content: space-between; position: relative; cursor: default }
+.menu button:hover, .menu button:focus { border-color: var(--hi) var(--lo) var(--lo) var(--hi); outline: none }
+.menu button kbd { font-family: var(--f-ui); color: var(--muted) }
+.menu button[aria-checked]::before { content: ""; position: absolute; left: 8px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi) }
+.menu button[role="menuitemradio"]::before { transform: rotate(45deg) scale(.85) }
+.menu button[aria-checked="true"]::before { border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: var(--sel) }
+.menu hr { border: 0; border-top: 2px groove var(--hi); border-top: 1px solid var(--lo); box-shadow: 0 1px 0 var(--hi); margin: 3px 4px }
+
+/* toolbar + toggles */
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px }
+.tog { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; cursor: default }
+.tog input { appearance: none; -webkit-appearance: none; margin: 0; width: 14px; height: 14px; background: var(--bg); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi) }
+.tog input:checked { border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: var(--sel) }
+.opt { appearance: none; -webkit-appearance: none; background: var(--bg); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); min-height: 28px; padding: 2px 32px 2px 10px; cursor: default;
+  background-image: linear-gradient(var(--hi), var(--hi)), linear-gradient(var(--lo), var(--lo)), linear-gradient(var(--bg), var(--bg));
+  background-size: 14px 2px, 14px 2px, 0 0; background-position: right 9px top calc(50% - 2px), right 9px top calc(50% + 2px); background-repeat: no-repeat }
+.opt option { background: var(--field); color: var(--fg) }
+
+/* viewport */
+.stage { position: relative; margin: 0 6px; min-height: 340px; aspect-ratio: 16 / 9; background: linear-gradient(180deg, var(--vp-top), var(--vp-bot) 78%); overflow: hidden }
+.stage canvas.gl { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block }
+.hud { position: absolute; left: 10px; top: 8px; right: 10px; display: flex; justify-content: space-between; gap: 10px; font-family: var(--f-mono); font-size: 12px; color: var(--hud); pointer-events: none; text-shadow: 0 1px 0 #000 }
+.hud b { font-size: 15px }
+.triad { position: absolute; left: 6px; bottom: 6px; width: 84px; height: 84px; pointer-events: none }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 6px 4px }
+.scale { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; padding-left: 6px; min-width: 0 }
+.scale .val { position: relative; height: 16px; font-family: var(--f-mono); font-size: 12px }
+.scale .val span { position: absolute; transform: translateX(-50%); white-space: nowrap }
+input.mscale { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; background: var(--trough); border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo) }
+input.mscale::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 14px; background: var(--bg); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi); box-shadow: inset 13px 0 0 -12px var(--lo); cursor: default }
+input.mscale::-moz-range-thumb { width: 26px; height: 10px; border-radius: 0; background: var(--bg); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi) }
+.msg { margin: 2px 6px 6px; padding: 3px 8px; min-height: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.strip { position: relative; height: 14px; background: var(--field); overflow: hidden }
+.strip .seg { position: absolute; top: 0; bottom: 0; border-right: 1px solid #000 }
+.strip .cur { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--fg); box-shadow: 0 0 0 1px var(--field) }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px }
+.legend i { display: inline-block; width: 12px; height: 10px; border: 1px solid #000; margin-right: 4px; vertical-align: -1px }
+
+/* monitor */
+.radios { display: flex; flex-wrap: wrap; gap: 6px 14px }
+.radio { display: inline-flex; align-items: center; gap: 6px }
+.radio i { width: 13px; height: 13px; transform: rotate(45deg); background: var(--bg); border: 2px solid; border-color: var(--hi) var(--lo) var(--lo) var(--hi) }
+.radio.on i { border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: var(--sel) }
+.radio.on { font-weight: bold }
+.field { background: var(--field) }
+.feet { display: flex; justify-content: space-around; align-items: flex-end }
+.foot { display: flex; flex-direction: column; align-items: center; gap: 4px }
+.sole { width: 62px; height: 108px; position: relative; background: var(--field) }
+.sole span { position: absolute; width: 16px; height: 16px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--led-off); border: 1px solid var(--fg) }
+.sole span.on { background: var(--led-on); border-color: #000; box-shadow: inset -2px -2px 0 rgba(0,0,0,.25) }
+table { border-collapse: collapse; width: 100% }
+.kv { font-family: var(--f-mono); font-size: 12px; font-variant-numeric: tabular-nums }
+.kv th { font-weight: normal; text-align: left; padding: 3px 8px; white-space: nowrap }
+.kv td { text-align: right; padding: 3px 8px; white-space: nowrap }
+.kv tr:nth-child(even) { background: color-mix(in srgb, var(--field) 70%, var(--bg)) }
+.dend { padding: 8px 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; font-size: 12px }
+.dend b { font-weight: bold }
+.small { font-size: 12px; color: var(--muted) }
+
+/* joints */
+.jrow { display: grid; grid-template-columns: 112px minmax(0, 1fr) 66px; align-items: center; gap: 10px }
+.jtrough { position: relative; height: 12px; background: var(--trough) }
+.jtrough::before { content: ""; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--muted) }
+.jthumb { position: absolute; top: -3px; bottom: -3px; width: 22px; margin-left: -11px }
+.jval { font-family: var(--f-mono); font-size: 12px; text-align: right; padding: 1px 6px; font-variant-numeric: tabular-nums }
+
+/* charts */
+.chart { display: block; width: 100%; height: 170px; cursor: crosshair }
+.chead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px }
+.key { display: inline-flex; align-items: center; gap: 5px; font-size: 12px }
+.key svg { display: block }
+
+/* table */
+.tblwrap { overflow-x: auto }
+.tbl { font-family: var(--f-mono); font-size: 12px; font-variant-numeric: tabular-nums; background: var(--field) }
+.tbl th, .tbl td { padding: 4px 8px; border-bottom: 1px solid var(--grid); text-align: right; white-space: nowrap }
+.tbl th:first-child, .tbl td:first-child, .tbl th:nth-child(2), .tbl td:nth-child(2) { text-align: left }
+.tbl thead th { font-family: var(--f-ui); background: var(--bg) }
+.tbl .paper { color: var(--muted) }
+.notes p { margin: 0 0 8px }
+
+/* front panel, icon box, dialog */
+.icons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 1600px; width: 100%; margin: 12px auto 0 }
+.icons:empty { display: none }
+.icons button { min-height: 28px }
+.fp { display: flex; flex-wrap: wrap; align-items: stretch; margin: 12px auto 0; max-width: 100% }
+.fp .cell { margin: 4px; padding: 4px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 86px }
+.fp .cell small { font-size: 11px; color: var(--muted) }
+.fp .cell b { font-family: var(--f-mono); font-size: 17px }
+.fp .launch { margin: 4px 2px; flex-direction: column; gap: 2px; padding: 4px 8px; font-size: 12px; min-width: 64px }
+.ws { margin: 4px 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; align-content: center }
+.ws .pb { min-height: 24px; font-size: 12px; padding: 0 12px }
+dialog { padding: 0; border: 0; background: transparent; color: var(--fg); max-width: min(560px, calc(100vw - 32px)) }
+dialog::backdrop { background: rgba(1, 4, 9, .45) }
+@media (max-width: 700px) { .stage { aspect-ratio: 4 / 3 } .jrow { grid-template-columns: 96px minmax(0, 1fr) 60px } }
+</style>
+</head>
+<body>
+
+<div class="tiles" id="tiles">
+
+<section class="win w-viewer" data-win="viewer" aria-labelledby="t-viewer">
+  <div class="tbar"><button class="wb" data-wmenu aria-label="Window menu"><i style="width:14px;height:5px"></i></button><h2 id="t-viewer">WL-10RD Viewer</h2><button class="wb" data-min aria-label="Minimize"><i style="width:6px;height:6px"></i></button><button class="wb" data-max aria-label="Maximize"><i style="width:14px;height:14px"></i></button></div>
+  <div class="client">
+    <nav class="mbar" aria-label="Viewer menu">
+      <button class="mi" data-menu="m-file" aria-haspopup="menu" aria-expanded="false"><u>F</u>ile</button>
+      <button class="mi" data-menu="m-view" aria-haspopup="menu" aria-expanded="false"><u>V</u>iew</button>
+      <button class="mi" data-menu="m-sim" aria-haspopup="menu" aria-expanded="false"><u>S</u>imulate</button>
+      <button class="mi" data-menu="m-opt" aria-haspopup="menu" aria-expanded="false"><u>O</u>ptions</button>
+      <button class="mi help" data-menu="m-help" aria-haspopup="menu" aria-expanded="false"><u>H</u>elp</button>
+      <div class="menu" id="m-file" role="menu" hidden>
+        <button role="menuitem" data-cmd="open">Open run.json… <kbd>Ctrl+O</kbd></button>
+        <button role="menuitem" data-cmd="png">Save view as PNG</button>
+        <hr>
+        <button role="menuitem" data-cmd="reset">Reset layout</button>
+      </div>
+      <div class="menu" id="m-view" role="menu" hidden>
+        <button role="menuitemradio" data-cmd="cam" data-arg="follow" aria-checked="true">Follow camera</button>
+        <button role="menuitemradio" data-cmd="cam" data-arg="side" aria-checked="false">Side</button>
+        <button role="menuitemradio" data-cmd="cam" data-arg="front" aria-checked="false">Front</button>
+        <button role="menuitemradio" data-cmd="cam" data-arg="top" aria-checked="false">Top</button>
+        <hr>
+        <button role="menuitemcheckbox" data-cmd="show" data-arg="com" aria-checked="true">CoM marker</button>
+        <button role="menuitemcheckbox" data-cmd="show" data-arg="zmp" aria-checked="true">ZMP marker</button>
+        <button role="menuitemcheckbox" data-cmd="show" data-arg="trails" aria-checked="true">Trails</button>
+        <button role="menuitemcheckbox" data-cmd="show" data-arg="prints" aria-checked="true">Footprints</button>
+        <button role="menuitemcheckbox" data-cmd="show" data-arg="grid" aria-checked="true">Floor grid</button>
+      </div>
+      <div class="menu" id="m-sim" role="menu" hidden>
+        <button role="menuitem" data-cmd="play">Play / Pause <kbd>Space</kbd></button>
+        <button role="menuitem" data-cmd="start">Go to start <kbd>Home</kbd></button>
+        <button role="menuitem" data-cmd="end">Go to end <kbd>End</kbd></button>
+        <hr>
+        <button role="menuitem" data-cmd="step" data-arg="-1">Step back <kbd>←</kbd></button>
+        <button role="menuitem" data-cmd="step" data-arg="1">Step forward <kbd>→</kbd></button>
+        <button role="menuitem" data-cmd="event" data-arg="-1">Previous event <kbd>[</kbd></button>
+        <button role="menuitem" data-cmd="event" data-arg="1">Next event <kbd>]</kbd></button>
+      </div>
+      <div class="menu" id="m-opt" role="menu" hidden>
+        <button role="menuitemradio" data-cmd="theme" data-arg="auto" aria-checked="true">Colours: follow system</button>
+        <button role="menuitemradio" data-cmd="theme" data-arg="light" aria-checked="false">Colours: light</button>
+        <button role="menuitemradio" data-cmd="theme" data-arg="dark" aria-checked="false">Colours: dark</button>
+      </div>
+      <div class="menu" id="m-help" role="menu" hidden>
+        <button role="menuitem" data-cmd="keys">Keyboard shortcuts <kbd>?</kbd></button>
+        <button role="menuitem" data-cmd="about">About this run</button>
+      </div>
+    </nav>
+    <div class="tools">
+      <label for="cam">Camera:</label>
+      <select id="cam" class="opt"><option value="follow">Follow</option><option value="side">Side</option><option value="front">Front</option><option value="top">Top</option></select>
+      <label for="shade">Shading:</label>
+      <select id="shade" class="opt"><option value="smooth">Gouraud</option><option value="flat">Flat</option><option value="wire">Wireframe</option></select>
+      <label class="tog"><input type="checkbox" data-show="com" checked>CoM</label>
+      <label class="tog"><input type="checkbox" data-show="zmp" checked>ZMP</label>
+      <label class="tog"><input type="checkbox" data-show="trails" checked>Trails</label>
+      <label class="tog"><input type="checkbox" data-show="prints" checked>Footprints</label>
+    </div>
+    <div class="stage dn" id="stage">
+      <div class="hud"><span id="hudL">—</span><span id="hudR" style="text-align:right">—</span></div>
+      <canvas class="triad" id="triad" width="168" height="168" aria-hidden="true"></canvas>
+    </div>
+    <div class="transport">
+      <button class="pb icon" data-cmd="start" aria-label="Go to start"><svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><rect x="1" y="1" width="2" height="10"/><path d="M13 1 L4 6 L13 11 Z"/></svg></button>
+      <button class="pb icon" data-cmd="event" data-arg="-1" aria-label="Previous event"><svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 1 L1 6 L8 11 Z M15 1 L8 6 L15 11 Z"/></svg></button>
+      <button class="pb icon" data-cmd="step" data-arg="-1" aria-label="Step back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M11 1 L2 6 L11 11 Z"/></svg></button>
+      <button class="pb default" id="play" data-cmd="play" aria-pressed="false" style="min-width:84px">Play</button>
+      <button class="pb icon" data-cmd="step" data-arg="1" aria-label="Step forward"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1 L10 6 L1 11 Z"/></svg></button>
+      <button class="pb icon" data-cmd="event" data-arg="1" aria-label="Next event"><svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M1 1 L8 6 L1 11 Z M8 1 L15 6 L8 11 Z"/></svg></button>
+      <button class="pb icon" data-cmd="end" aria-label="Go to end"><svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><path d="M1 1 L10 6 L1 11 Z"/><rect x="11" y="1" width="2" height="10"/></svg></button>
+      <select id="speed" class="opt" aria-label="Playback speed"><option value="0.1">0.1×</option><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+      <div class="scale"><div class="val"><span id="scrubVal">0.000</span></div><input type="range" class="mscale" id="scrub" min="0" max="10000" value="0" aria-label="Simulation time"></div>
+    </div>
+    <div class="strip dn" id="strip" aria-hidden="true"><div class="cur" id="stripCur"></div></div>
+    <div class="legend" id="legend" style="padding:4px 6px 0"></div>
+    <div class="msg dn" id="msg" role="status">—</div>
+  </div>
+</section>
+
+<section class="win w-monitor" data-win="monitor" aria-labelledby="t-monitor">
+  <div class="tbar"><button class="wb" data-wmenu aria-label="Window menu"><i style="width:14px;height:5px"></i></button><h2 id="t-monitor">Change-over Monitor</h2><button class="wb" data-min aria-label="Minimize"><i style="width:6px;height:6px"></i></button><button class="wb" data-max aria-label="Maximize"><i style="width:14px;height:14px"></i></button></div>
+  <div class="client pad">
+    <div>
+      <div style="font-weight:bold;margin-bottom:6px">Phase</div>
+      <div class="radios" id="radios" role="group" aria-label="Current phase"></div>
+      <div id="coInfo" style="margin-top:8px"></div>
+    </div>
+    <div class="dend dn field" id="dend"></div>
+    <div>
+      <div style="font-weight:bold;margin-bottom:6px">Sole switches <span class="small">(top view, toe up, outer edge outside)</span></div>
+      <div class="feet">
+        <div class="foot"><div class="sole dn" id="soleL" role="img" aria-label="Left sole switches"></div><span id="footLab-L"><b>L</b></span></div>
+        <div class="foot"><div class="sole dn" id="soleR" role="img" aria-label="Right sole switches"></div><span id="footLab-R"><b>R</b></span></div>
+      </div>
+    </div>
+    <table class="kv dn field"><tbody id="readout"></tbody></table>
+  </div>
+</section>
+
+<section class="win w-joints" data-win="joints" aria-labelledby="t-joints">
+  <div class="tbar"><button class="wb" data-wmenu aria-label="Window menu"><i style="width:14px;height:5px"></i></button><h2 id="t-joints">Joint Panel</h2><button class="wb" data-min aria-label="Minimize"><i style="width:6px;height:6px"></i></button><button class="wb" data-max aria-label="Maximize"><i style="width:14px;height:14px"></i></button></div>
+  <div class="client pad" style="gap:7px">
+    <div class="small" style="display:flex;justify-content:space-between;gap:10px"><span>joint angle (deg), display range ±90</span><span>read-only during replay</span></div>
+    <div id="joints" style="display:grid;gap:7px"></div>
+  </div>
+</section>
+
+<section class="win w-strip" data-win="strip" aria-labelledby="t-strip">
+  <div class="tbar"><button class="wb" data-wmenu aria-label="Window menu"><i style="width:14px;height:5px"></i></button><h2 id="t-strip">Strip Chart</h2><button class="wb" data-min aria-label="Minimize"><i style="width:6px;height:6px"></i></button><button class="wb" data-max aria-label="Maximize"><i style="width:14px;height:14px"></i></button></div>
+  <div class="client pad">
+    <div class="chead"><label for="sig1">Signals:</label><select id="sig1" class="opt"></select><span id="key1" class="chead"></span></div>
+    <div class="dn field"><canvas class="chart" id="c1"></canvas></div>
+    <div class="chead"><label for="sig2">Signals:</label><select id="sig2" class="opt"></select><span id="key2" class="chead"></span></div>
+    <div class="dn field"><canvas class="chart" id="c2"></canvas></div>
+    <div class="small">Click or drag on a chart to seek.</div>
+  </div>
+</section>
+
+<section class="win w-plan" data-win="plan" aria-labelledby="t-plan" hidden>
+  <div class="tbar"><button class="wb" data-wmenu aria-label="Window menu"><i style="width:14px;height:5px"></i></button><h2 id="t-plan">Plan View</h2><button class="wb" data-min aria-label="Minimize"><i style="width:6px;height:6px"></i></button><button class="wb" data-max aria-label="Maximize"><i style="width:14px;height:14px"></i></button></div>
+  <div class="client pad">
+    <div class="chead"><span class="key"><svg width="24" height="6" aria-hidden="true"><path d="M0 3 H24" style="stroke:var(--s1)" stroke-width="2.5"/></svg>CoM</span><span class="key"><svg width="24" height="6" aria-hidden="true"><path d="M0 3 H24" style="stroke:var(--s2)" stroke-width="1.5" stroke-dasharray="4 2"/></svg>ZMP (from spike forces)</span><span class="key">□ footprints</span></div>
+    <div class="dn field"><canvas class="chart" id="cPlan" style="height:250px"></canvas></div>
+    <div class="small">Like the paper's Fig. 12: sole rectangles at each footstep, CoM and measured ZMP.</div>
+  </div>
+</section>
+
+<section class="win w-phase" data-win="phase" aria-labelledby="t-phase" hidden>
+  <div class="tbar"><button class="wb" data-wmenu aria-label="Window menu"><i style="width:14px;height:5px"></i></button><h2 id="t-phase">Phase Plane</h2><button class="wb" data-min aria-label="Minimize"><i style="width:6px;height:6px"></i></button><button class="wb" data-max aria-label="Maximize"><i style="width:14px;height:14px"></i></button></div>
+  <div class="client pad">
+    <div class="legend" id="legend2"></div>
+    <div class="dn field"><canvas class="chart" id="cPhase" style="height:250px"></canvas></div>
+    <div class="small">After Fig. 8: forward CoM speed against CoM advance since the start of phase A, one trace per change-over, coloured by phase.</div>
+  </div>
+</section>
+
+<section class="win w-table" data-win="table" aria-labelledby="t-table" hidden>
+  <div class="tbar"><button class="wb" data-wmenu aria-label="Window menu"><i style="width:14px;height:5px"></i></button><h2 id="t-table">Change-over Table</h2><button class="wb" data-min aria-label="Minimize"><i style="width:6px;height:6px"></i></button><button class="wb" data-max aria-label="Maximize"><i style="width:14px;height:14px"></i></button></div>
+  <div class="client pad">
+    <div class="tblwrap dn"><table class="tbl" id="tbl"></table></div>
+    <div class="small">Values tuned in simulation, starting from the paper's Table 3 (in brackets). Set torques were kept within the paper's ±100 N·m ankle range, but several damping values (up to about 550 N·m·s/rad) are above what the paper reports for its actuators, so treat the table as one solution for the estimated model, not a reconstruction of the robot's.</div>
+    <div class="small">VIS N·m·s/rad, ELA N·m/rad, NP deg, TRQ N·m. POS = position control. H/F = hind/front ankle, P/R = pitch/roll. Roll values are mirrored per side (+ = hip outboard of the foot).</div>
+  </div>
+</section>
+
+<section class="win w-notes" data-win="notes" aria-labelledby="t-notes" hidden>
+  <div class="tbar"><button class="wb" data-wmenu aria-label="Window menu"><i style="width:14px;height:5px"></i></button><h2 id="t-notes">What is from the paper and what is not</h2><button class="wb" data-min aria-label="Minimize"><i style="width:6px;height:6px"></i></button><button class="wb" data-max aria-label="Maximize"><i style="width:14px;height:14px"></i></button></div>
+  <div class="client pad notes">
+    <div class="dn field" style="padding:10px 12px">
+      <p><b>From the papers:</b> link lengths, hip spacing, foot size and total mass (83 kg); 40 cm steps with 1.0 s single support; straighter legs than before (Fig. 18, and Figs. 7 and 10 of the WL-10R paper show nearly straight support legs; in this model the knees still bend about 45° while walking, down from about 63° in the first version, because the legs must reach a 40 cm stance); the CoM path over the sole in single support (Fig. 12, digitized); the three-state, sixth-order joint pattern with start and end acceleration, checked by ZMP; the tracking mode of Eq. 45 (sign corrected); four change-over phases switched by four micro switches per sole and the front ankle angle; ankle impedance control of Eq. 33 within ±100 N·m.</p>
+      <p><b>Estimated:</b> the mass of every link (55 kg above the hips, 14 kg per leg, chosen so the CoM sits about 0.77 m above the ankle axis, as Figs. 8 and 12 together imply); servo stiffness; spike positions; switch threshold. The papers give none of these.</p>
+      <p><b>Changed to make it walk:</b> hip and knee joints follow the measured pelvis during the change-over so the feet stay on their footprints (the paper says these joints do not move); the hind ankle roll is compliant in A and B; phase D also waits for the front ankle roll and a flat front foot, with a 0.35 s time-out; the stop step sets the swing foot down beside the support foot while the body is still moving, then settles in double support (the paper does not say how its walks stop). The change-over table and the patterns were tuned by search in this simulation.</p>
+      <p style="margin:0"><b>Result vs paper:</b> each change-over takes about 0.8 s, not 0.5 s, and phase D always ends on the time-out rather than the ankle-angle trigger. For most of each single-support phase the support foot is loaded on its outer edge, not on all four spikes. The CoM enters single support about 3 cm further inboard than Fig. 12. This 4-change-over walk completes, but a 5th change-over fails, and an extra 0.02 m/s of sideways velocity at the start makes it fall, so the solution is fragile.</p>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<div class="icons" id="icons" aria-label="Minimized windows"></div>
+
+<nav class="fp up" aria-label="Front panel">
+  <div class="cell dn"><small>sim time</small><b id="fpTime">0.000</b></div>
+  <button class="pb launch" data-launch="viewer"><svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><rect x="1" y="1" width="26" height="17" fill="#0d1117" stroke="currentColor"/><path d="M4 15 L9 8 L13 12 L18 4 L24 11" stroke="#e3b341" stroke-width="1.5" fill="none"/></svg>Viewer</button>
+  <button class="pb launch" data-launch="monitor"><svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><rect x="5" y="1" width="8" height="20" fill="none" stroke="currentColor"/><rect x="15" y="1" width="8" height="20" fill="none" stroke="currentColor"/><circle cx="8" cy="5" r="2"/><circle cx="8" cy="17" r="2"/></svg>Monitor</button>
+  <button class="pb launch" data-launch="joints"><svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><path d="M3 5 H25 M3 11 H25 M3 17 H25" stroke="currentColor" fill="none"/><rect x="8" y="3" width="5" height="4"/><rect x="15" y="9" width="5" height="4"/><rect x="6" y="15" width="5" height="4"/></svg>Joints</button>
+  <button class="pb launch" data-launch="strip"><svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><rect x="1" y="1" width="26" height="20" fill="none" stroke="currentColor"/><path d="M3 14 L7 9 L11 13 L15 5 L19 15 L25 8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>Charts</button>
+  <div class="ws" role="group" aria-label="Workspaces">
+    <button class="pb" data-ws="walk" aria-pressed="true" style="background:var(--ph-c);color:var(--ph-c-fg)">Walk</button>
+    <button class="pb" data-ws="analysis" aria-pressed="false" style="background:var(--ph-a);color:var(--ph-a-fg)">Analysis</button>
+    <button class="pb" data-ws="method" aria-pressed="false" style="background:var(--fa);color:var(--fa-fg)">Method</button>
+    <button class="pb" data-ws="all" aria-pressed="false" style="background:var(--ph-st);color:var(--ph-st-fg)">All</button>
+  </div>
+  <button class="pb launch" data-launch="plan"><svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><rect x="2" y="3" width="8" height="5" fill="none" stroke="currentColor"/><rect x="11" y="14" width="8" height="5" fill="none" stroke="currentColor"/><path d="M4 11 C10 4 14 18 26 9" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>Plan</button>
+  <button class="pb launch" data-launch="phase"><svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><path d="M2 20 H26 M2 20 V2" stroke="currentColor" fill="none"/><path d="M4 14 C8 4 16 4 24 18" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>Phase</button>
+  <button class="pb launch" data-launch="table"><svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><rect x="2" y="2" width="24" height="18" fill="none" stroke="currentColor"/><path d="M2 8 H26 M2 14 H26 M10 2 V20 M18 2 V20" stroke="currentColor"/></svg>Table</button>
+  <button class="pb launch" data-launch="notes"><svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><rect x="5" y="1" width="18" height="20" fill="none" stroke="currentColor"/><path d="M8 6 H20 M8 10 H20 M8 14 H16" stroke="currentColor"/></svg>Notes</button>
+  <div class="cell dn"><small>phase</small><b id="fpPhase">—</b></div>
+</nav>
+<div style="height:14px"></div>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <div class="win active">
+    <div class="tbar"><h2 id="dlgTitle">Help</h2></div>
+    <div class="client pad"><div id="dlgBody"></div><div style="display:flex;justify-content:flex-end"><button class="pb default" id="dlgOk" style="min-width:80px">OK</button></div></div>
+  </div>
+</dialog>
+<input type="file" id="fileIn" accept=".json,application/json" hidden>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script id="run-data" type="application/json">__RUN_DATA__</script>
+<script>
+(function () {
+'use strict';
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const store = { get(k) { try { return localStorage.getItem('wl10rd.' + k); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem('wl10rd.' + k, v); } catch (e) { /* storage unavailable */ } } };
+
+const PH = { SS: 'ss', A: 'a', B: 'b', C: 'c', D: 'd' };
+const phKey = p => PH[p] || 'st';
+const PHNAME = { SS: 'Single support', A: 'Phase A', B: 'Phase B', C: 'Phase C', D: 'Phase D', stand: 'Standing', shift: 'Weight shift', land: 'Landing', settle: 'Settling' };
+const SW = ['L_toe_o', 'L_toe_i', 'L_heel_o', 'L_heel_i', 'R_toe_o', 'R_toe_i', 'R_heel_o', 'R_heel_i'];
+const SPIKE = { toe_o: [0.82, 0.14], toe_i: [0.18, 0.14], heel_o: [0.82, 0.86], heel_i: [0.18, 0.86] };
+const WS = { walk: ['viewer', 'monitor', 'joints', 'strip'], analysis: ['viewer', 'plan', 'phase', 'strip'], method: ['monitor', 'table', 'notes'], all: ['viewer', 'monitor', 'joints', 'strip', 'plan', 'phase', 'table', 'notes'] };
+const WS0 = JSON.stringify(WS);
+const SIGNALS = {
+  lat: { label: 'Lateral y: CoM, ZMP (m)', series: [['CoM', i => S.com[i][1]], ['ZMP', i => S.zmp[i] ? S.zmp[i][1] : null]], range: [-0.3, 0.3] },
+  fwd: { label: 'Forward x: CoM, ZMP (m)', series: [['CoM', i => S.com[i][0]], ['ZMP', i => S.zmp[i] ? S.zmp[i][0] : null]] },
+  taup: { label: 'Ankle pitch torque L, R (N·m)', series: [['L', i => S.tau_ankle[i][0]], ['R', i => S.tau_ankle[i][2]]], range: [-110, 110] },
+  taur: { label: 'Ankle roll torque L, R (N·m)', series: [['L', i => S.tau_ankle[i][1]], ['R', i => S.tau_ankle[i][3]]], range: [-110, 110] },
+  knee: { label: 'Knee angle L, R (deg)', series: [['L', i => S.q[i][J.L_knee]], ['R', i => S.q[i][J.R_knee]]] },
+  apitch: { label: 'Ankle pitch angle L, R (deg)', series: [['L', i => S.q[i][J.L_ankle_pitch]], ['R', i => S.q[i][J.R_ankle_pitch]]] },
+  height: { label: 'Height z: pelvis, CoM (m)', series: [['pelvis', i => S.pelvis[i][2]], ['CoM', i => S.com[i][2]]] }
+};
+
+let RUN, S, F, T0, T1, J, phStart, prints, coRuns;
+let cur = 0, playing = false, last = null, view = 'follow';
+const show = { com: true, zmp: true, trails: true, prints: true, grid: true };
+
+// ---------------- window manager
+const wins = [...document.querySelectorAll('.win[data-win]')];
+const W = name => document.querySelector(`.win[data-win="${name}"]`);
+let ws = store.get('ws') || 'walk'; if (!WS[ws]) ws = 'walk';
+let minimized = new Set(), maximized = null;
+function layout() {
+  const set = WS[ws];
+  for (const w of wins) {
+    const n = w.dataset.win;
+    w.hidden = !set.includes(n) || minimized.has(n) || (maximized && maximized !== n);
+    w.classList.toggle('max', maximized === n);
+    w.querySelector('[data-max]').setAttribute('aria-label', maximized === n ? 'Restore' : 'Maximize');
+  }
+  document.querySelectorAll('[data-ws]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ws === ws)));
+  const ic = $('icons'); ic.innerHTML = '';
+  for (const n of set) if (minimized.has(n)) {
+    const b = document.createElement('button'); b.className = 'pb';
+    b.textContent = W(n).querySelector('h2').textContent; b.title = 'Restore window';
+    b.onclick = () => launch(n); ic.appendChild(b);
+  }
+  if (!wins.some(w => !w.hidden && w.classList.contains('active'))) { const f = wins.find(w => !w.hidden); if (f) focusWin(f); }
+  requestAnimationFrame(() => { resize(); drawCharts(); });
+}
+function focusWin(w) { wins.forEach(x => x.classList.toggle('active', x === w)); }
+function launch(n) {
+  if (!WS[ws].includes(n)) WS[ws] = [...WS[ws], n];   // open it in the current workspace, as CDE does
+  minimized.delete(n); if (maximized && maximized !== n) maximized = null; layout(); focusWin(W(n));
+  W(n).querySelector('h2').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+for (const w of wins) {
+  w.addEventListener('pointerdown', () => focusWin(w)); w.addEventListener('focusin', () => focusWin(w));
+  w.querySelector('[data-min]').onclick = () => { minimized.add(w.dataset.win); if (maximized === w.dataset.win) maximized = null; layout(); };
+  w.querySelector('[data-max]').onclick = () => { maximized = maximized === w.dataset.win ? null : w.dataset.win; layout(); };
+  w.querySelector('[data-wmenu]').onclick = () => { maximized = maximized === w.dataset.win ? null : w.dataset.win; layout(); };
+  w.querySelector('[data-wmenu]').title = 'Window menu: toggles maximize';
+}
+document.querySelectorAll('[data-ws]').forEach(b => b.onclick = () => { ws = b.dataset.ws; maximized = null; store.set('ws', ws); layout(); });
+document.querySelectorAll('[data-launch]').forEach(b => b.onclick = () => launch(b.dataset.launch));
+
+// ---------------- menus
+let openMenu = null;
+function closeMenu(focusBtn) {
+  if (!openMenu) return; const [btn, m] = openMenu; m.hidden = true; btn.setAttribute('aria-expanded', 'false'); openMenu = null; if (focusBtn) btn.focus();
+}
+function showMenu(btn, focusFirst) {
+  closeMenu(); const m = $(btn.dataset.menu);
+  const bar = btn.parentElement.getBoundingClientRect(), r = btn.getBoundingClientRect();
+  m.hidden = false; btn.setAttribute('aria-expanded', 'true'); openMenu = [btn, m];
+  const left = Math.min(r.left - bar.left, bar.width - m.offsetWidth - 4);
+  m.style.left = Math.max(0, left) + 'px'; m.style.top = (r.bottom - bar.top) + 'px';
+  if (focusFirst) m.querySelector('button').focus();
+}
+document.querySelectorAll('.mi[data-menu]').forEach(b => {
+  b.onclick = e => { if (openMenu && openMenu[0] === b) closeMenu(); else showMenu(b, e.detail === 0); };
+  b.onkeydown = e => { if (e.key === 'ArrowDown') { e.preventDefault(); showMenu(b, true); } };
+});
+document.querySelectorAll('.menu').forEach(m => m.addEventListener('keydown', e => {
+  const items = [...m.querySelectorAll('button')], k = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(k + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus(); }
+  else if (e.key === 'Escape') { e.preventDefault(); closeMenu(true); }
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault(); const bars = [...openMenu[0].parentElement.querySelectorAll('.mi')];
+    const n = bars[(bars.indexOf(openMenu[0]) + (e.key === 'ArrowRight' ? 1 : bars.length - 1)) % bars.length]; showMenu(n, true);
+  } else if (e.key === 'Tab') closeMenu();
+}));
+document.addEventListener('pointerdown', e => { if (openMenu && !openMenu[1].contains(e.target) && e.target !== openMenu[0]) closeMenu(); });
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cmd]'); if (!b) return;
+  const inMenu = !!b.closest('.menu'); if (inMenu) closeMenu(true);
+  cmd(b.dataset.cmd, b.dataset.arg);
+});
+function syncChecks() {
+  document.querySelectorAll('[data-cmd="cam"]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.arg === view)));
+  document.querySelectorAll('[data-cmd="show"]').forEach(b => b.setAttribute('aria-checked', String(show[b.dataset.arg])));
+  document.querySelectorAll('[data-show]').forEach(c => c.checked = show[c.dataset.show]);
+  const th = store.get('theme') || 'auto';
+  document.querySelectorAll('[data-cmd="theme"]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.arg === th)));
+  $('cam').value = view;
+}
+
+// ---------------- commands
+function cmd(c, arg) {
+  if (c === 'play') { playing = !playing; if (playing && cur >= T1) cur = T0; last = null; syncPlay(); }
+  else if (c === 'start') { cur = T0; update(); }
+  else if (c === 'end') { cur = T1; update(); }
+  else if (c === 'step') { playing = false; syncPlay(); cur = clamp(cur + (+arg) * 0.02); update(); }
+  else if (c === 'event') {
+    playing = false; syncPlay(); const ts = RUN.events.map(e => e[0]);
+    const t = +arg > 0 ? ts.find(x => x > cur + 1e-4) : [...ts].reverse().find(x => x < cur - 1e-4);
+    cur = t != null ? t : (+arg > 0 ? T1 : T0); update();
+  }
+  else if (c === 'cam') { setView(arg); }
+  else if (c === 'show') { show[arg] = !show[arg]; applyShow(); }
+  else if (c === 'theme') { store.set('theme', arg); applyTheme(); }
+  else if (c === 'open') $('fileIn').click();
+  else if (c === 'png') { renderer.render(scene, camera); const a = document.createElement('a'); a.download = `wl10rd_t${cur.toFixed(3)}.png`; a.href = renderer.domElement.toDataURL('image/png'); a.click(); }
+  else if (c === 'reset') { Object.assign(WS, JSON.parse(WS0)); minimized.clear(); maximized = null; ws = 'walk'; store.set('ws', ws); layout(); }
+  else if (c === 'keys') dialog('Keyboard shortcuts', '<table class="kv"><tbody>' + [['Space', 'Play / pause'], ['← →', 'Step 0.02 s (Shift: 0.1 s)'], ['[ ]', 'Previous / next event'], ['Home End', 'Start / end'], ['1 2 3 4', 'Camera: follow, side, front, top'], ['Ctrl+O', 'Open a run.json'], ['?', 'This help'], ['F10', 'Focus the menu bar']].map(r => `<tr><th>${r[0]}</th><td style="text-align:left">${r[1]}</td></tr>`).join('') + '</tbody></table>');
+  else if (c === 'about') {
+    const n = RUN.events.filter(e => e[1].startsWith('A_')).length;
+    dialog('About this run', `<p style="margin-top:0">${esc(RUN.title || 'WL-10RD simulation')}: ${RUN.fail ? 'fell (' + esc(RUN.fail) + ')' : 'walk completed'}, ${n} change-overs, ${(T1 - T0).toFixed(3)} s.</p><p>MuJoCo replay of Takanishi, Ishida, Yamazaki and Kato, "The Realization of Dynamic Walking by the Biped Walking Robot WL-10RD", <i>JRSJ</i> 3(4), 1985. Masses, servo constants and the change-over table are estimates or tuned values; see the Notes window and the README.</p><p style="margin-bottom:0" class="small">Look: CDE / Motif conventions in GitHub Primer colours.</p>`);
+  }
+}
+const clamp = t => Math.max(T0, Math.min(T1, t));
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+function syncPlay() { $('play').textContent = playing ? 'Pause' : 'Play'; $('play').setAttribute('aria-pressed', String(playing)); }
+function dialog(title, html) {
+  const d = $('dlg'); $('dlgTitle').textContent = title; $('dlgBody').innerHTML = html;
+  if (d.showModal) d.showModal(); else d.setAttribute('open', ''); $('dlgOk').focus();
+}
+$('dlgOk').onclick = () => { const d = $('dlg'); if (d.close) d.close(); else d.removeAttribute('open'); };
+$('cam').onchange = e => setView(e.target.value);
+$('shade').onchange = e => setShading(e.target.value);
+document.querySelectorAll('[data-show]').forEach(c => c.onchange = () => { show[c.dataset.show] = c.checked; applyShow(); });
+$('fileIn').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(txt => { load(JSON.parse(txt)); $('t-viewer').textContent = 'WL-10RD Viewer: ' + f.name; })
+    .catch(err => dialog('Could not open file', `<p style="margin:0">${esc(f.name)} is not a run.json written by run_walk (${esc(err.message)}).</p>`));
+  e.target.value = '';
+};
+document.addEventListener('keydown', e => {
+  if (e.key === 'F10') { e.preventDefault(); document.querySelector('.mi').focus(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); cmd('open'); return; }
+  if (openMenu || $('dlg').open) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'select' || (tag === 'input' && e.target.type !== 'checkbox' && e.target.type !== 'range') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (tag === 'input' && e.target.type === 'range' && e.key.startsWith('Arrow')) return;
+  const map = { ' ': ['play'], ArrowLeft: ['step', e.shiftKey ? -5 : -1], ArrowRight: ['step', e.shiftKey ? 5 : 1], '[': ['event', -1], ']': ['event', 1], Home: ['start'], End: ['end'], '?': ['keys'], '1': ['cam', 'follow'], '2': ['cam', 'side'], '3': ['cam', 'front'], '4': ['cam', 'top'] };
+  const m = map[e.key]; if (!m) return;
+  if (e.key === ' ' && tag === 'button') return;
+  e.preventDefault(); cmd(m[0], m[1]);
+});
+
+// ---------------- theme
+function applyTheme() {
+  const th = store.get('theme') || 'auto';
+  if (th === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', th);
+  syncChecks(); if (RUN) { buildStrip(); recolour(); update(); }
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme());
+
+// ---------------- 3D
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.domElement.className = 'gl'; stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.05, 60); camera.up.set(0, 0, 1);
+const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.8));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(2, -3, 5); scene.add(sun);
+let world = new THREE.Group(); scene.add(world);
+let bodies = [], meshes = [], floor, grid, comMark, comDrop, zmpMark, comTrail, zmpTrail, printGroup, shading = 'smooth';
+function makeMat(rgb) {
+  if (shading === 'wire') return new THREE.MeshBasicMaterial({ color: rgb, wireframe: true });
+  return new THREE.MeshPhongMaterial({ color: rgb, flatShading: shading === 'flat', shininess: shading === 'flat' ? 0 : 40, specular: 0x333333 });
+}
+function setShading(s) { shading = s; for (const m of meshes) { const c = m.material.color.clone(); m.material.dispose(); m.material = makeMat(c); } }
+function buildScene() {
+  scene.remove(world); world = new THREE.Group(); scene.add(world); bodies = []; meshes = [];
+  floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 10), new THREE.MeshLambertMaterial({ color: new THREE.Color(css('--floor')) }));
+  floor.position.set(8, 0, 0); world.add(floor);
+  grid = new THREE.GridHelper(40, 200, new THREE.Color(css('--floorline')), new THREE.Color(css('--floorline')));
+  grid.rotation.x = Math.PI / 2; grid.position.set(8, 0, 0.0005); world.add(grid);
+  for (let b = 0; b < RUN.nbody; b++) { const g = new THREE.Group(); world.add(g); bodies.push(g); }
+  for (const g of RUN.geoms) {
+    if (g.body === 0) continue;
+    let geo;
+    if (g.type === 'box') geo = new THREE.BoxGeometry(2 * g.size[0], 2 * g.size[1], 2 * g.size[2]);
+    else if (g.type === 'cylinder') { geo = new THREE.CylinderGeometry(g.size[0], g.size[0], 2 * g.size[1], 24); geo.rotateX(Math.PI / 2); }
+    else geo = new THREE.SphereGeometry(g.size[0], 16, 10);
+    const mesh = new THREE.Mesh(geo, makeMat(new THREE.Color(g.rgba[0], g.rgba[1], g.rgba[2])));
+    mesh.position.set(...g.pos); mesh.quaternion.set(g.quat[1], g.quat[2], g.quat[3], g.quat[0]);
+    bodies[g.body - 1].add(mesh); meshes.push(mesh);
+  }
+  comMark = new THREE.Mesh(new THREE.SphereGeometry(0.03, 24, 16), new THREE.MeshPhongMaterial({ color: new THREE.Color(css('--com')), shininess: 60 }));
+  comDrop = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 1, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--com')) }));
+  comDrop.rotation.x = Math.PI / 2;
+  zmpMark = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.06, 20), new THREE.MeshPhongMaterial({ color: new THREE.Color(css('--zmp')) }));
+  zmpMark.rotation.x = -Math.PI / 2;
+  world.add(comMark, comDrop, zmpMark);
+  const trail = (key, colour, z) => {
+    const pts = []; for (let i = 0; i < S.t.length; i += 2) { const v = S[key][i]; pts.push(v ? new THREE.Vector3(v[0], v[1], z) : pts.length ? pts[pts.length - 1].clone() : new THREE.Vector3(0, 0, z)); }
+    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: new THREE.Color(colour) })); world.add(l); return l;
+  };
+  comTrail = trail('com', css('--com'), 0.002); zmpTrail = trail('zmp', css('--zmp'), 0.003);
+  printGroup = new THREE.Group(); world.add(printGroup);
+  for (const p of prints) {
+    const pts = [[-0.14, -0.07], [0.14, -0.07], [0.14, 0.07], [-0.14, 0.07]].map(([dx, dy]) => new THREE.Vector3(p[0] + dx, p[1] + dy, 0.004));
+    const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--hud')) }));
+    l.userData.t = p[3]; printGroup.add(l);
+  }
+  applyShow();
+}
+function recolour() {
+  if (!floor) return;
+  floor.material.color.set(css('--floor')); grid.material.color.set(css('--floorline'));
+}
+function applyShow() {
+  if (!comMark) return;
+  comMark.visible = comDrop.visible = show.com; comTrail.visible = show.com && show.trails; zmpTrail.visible = show.zmp && show.trails;
+  printGroup.visible = show.prints; grid.visible = show.grid; syncChecks(); update();
+}
+function setView(v) {
+  view = v; syncChecks(); if (!S) return;
+  const p = S.pelvis[idxAt(cur)];
+  if (v === 'side') camera.position.set(p[0], p[1] - 4.2, 0.9);
+  else if (v === 'front') camera.position.set(p[0] + 4.2, p[1], 0.9);
+  else if (v === 'top') camera.position.set(p[0], p[1] - 0.05, 5.5);
+  else camera.position.set(p[0] + 2.2, p[1] - 3.0, 1.6);
+  controls.target.set(p[0], 0, v === 'top' ? 0 : 0.6); controls.update(); update();
+}
+function resize() {
+  const r = stage.getBoundingClientRect(); if (r.width < 2) return;
+  renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+}
+new ResizeObserver(() => { resize(); }).observe(stage);
+const triad = $('triad').getContext('2d');
+function drawTriad() {
+  const c = triad, s = 168, o = 56; c.clearRect(0, 0, s, s);
+  const qi = camera.quaternion.clone().invert();
+  const axes = [['X', new THREE.Vector3(1, 0, 0), css('--ax-x')], ['Y', new THREE.Vector3(0, 1, 0), css('--ax-y')], ['Z', new THREE.Vector3(0, 0, 1), css('--ax-z')]]
+    .map(([n, v, col]) => [n, v.applyQuaternion(qi), col]).sort((a, b) => a[1].z - b[1].z);
+  c.lineWidth = 5; c.font = 'bold 22px Helvetica, Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const [n, v, col] of axes) {
+    const x = s / 2 + v.x * o, y = s / 2 - v.y * o;
+    c.strokeStyle = col; c.beginPath(); c.moveTo(s / 2, s / 2); c.lineTo(x, y); c.stroke();
+    c.fillStyle = col; c.fillText(n, s / 2 + v.x * (o + 18), s / 2 - v.y * (o + 18));
+  }
+}
+
+// ---------------- data helpers
+function idxAt(t) { let lo = 0, hi = S.t.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (S.t[m] <= t) lo = m; else hi = m - 1; } return lo; }
+function frameAt(t) { let lo = 0, hi = F.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (F[m].t <= t) lo = m; else hi = m - 1; } return lo; }
+function buildDerived() {
+  J = {}; RUN.joint_names.forEach((n, k) => J[n] = k);
+  phStart = new Array(S.t.length); for (let i = 0; i < S.t.length; i++) phStart[i] = i && S.phase[i] === S.phase[i - 1] ? phStart[i - 1] : i;
+  prints = [];
+  if (RUN.supports && RUN.supports.length) {
+    prints.push([0, 0.13, 'L', 0], [0, -0.13, 'R', 0]);
+    for (const [t, side, a] of RUN.supports) if (!prints.some(p => Math.hypot(p[0] - a[0], p[1] - a[1]) < 0.05)) prints.push([a[0], a[1], side, t]);
+  } else if (RUN.footprints) RUN.footprints.forEach((f, k) => prints.push([f[0], f[1], f[1] > 0 ? 'L' : 'R', 0]));
+  coRuns = []; let r = null;
+  for (let i = 1; i < S.t.length; i++) {
+    const ph = S.phase[i];
+    if (ph.length === 1 && 'ABCD'.includes(ph)) { if (!r) { r = { i0: i, pts: [] }; coRuns.push(r); } r.pts.push([i, (S.com[i][0] - S.com[i - 1][0]) / (S.t[i] - S.t[i - 1]), ph]); }
+    else r = null;
+  }
+}
+
+// ---------------- static panels
+function buildStrip() {
+  const strip = $('strip'); strip.querySelectorAll('.seg').forEach(e => e.remove());
+  let a = 0;
+  for (let i = 1; i <= S.t.length; i++) if (i === S.t.length || S.phase[i] !== S.phase[a]) {
+    const el = document.createElement('div'); el.className = 'seg';
+    el.style.left = ((S.t[a] - T0) / (T1 - T0) * 100) + '%';
+    el.style.width = ((S.t[Math.min(i, S.t.length - 1)] - S.t[a]) / (T1 - T0) * 100) + '%';
+    el.style.background = `var(--ph-${phKey(S.phase[a])})`; el.title = PHNAME[S.phase[a]] || S.phase[a];
+    strip.insertBefore(el, $('stripCur')); a = i;
+  }
+}
+function buildStatic() {
+  const items = [['ss', 'SS single support'], ['a', 'A rear foot only'], ['b', 'B front heel down'], ['c', 'C both feet flat'], ['d', 'D rear foot leaving'], ['st', 'stand, shift, settle']];
+  $('legend').innerHTML = items.map(([k, l]) => `<span><i style="background:var(--ph-${k})"></i>${l}</span>`).join('');
+  $('legend2').innerHTML = items.slice(1, 5).map(([k, l]) => `<span><i style="background:var(--ph-${k})"></i>${l}</span>`).join('');
+  $('radios').innerHTML = ['SS', 'A', 'B', 'C', 'D'].map(p => `<span class="radio" data-ph="${p}" aria-current="false"><i aria-hidden="true"></i>${p}</span>`).join('');
+  for (const side of ['L', 'R']) {
+    const sole = $('sole' + side); sole.innerHTML = '';
+    for (const k of SW.filter(k => k[0] === side)) {
+      const nm = k.slice(2), p = SPIKE[nm], el = document.createElement('span');
+      el.style.left = ((side === 'L' ? 1 - p[0] : p[0]) * 100) + '%'; el.style.top = (p[1] * 100) + '%'; el.dataset.sw = k; el.title = nm.replace('_', ' ');
+      sole.appendChild(el);
+    }
+  }
+  $('joints').innerHTML = RUN.joint_names.map((n, k) => `<div class="jrow"><span>${n.replace(/_/g, ' ')}</span><div class="jtrough dn" role="meter" aria-label="${n.replace(/_/g, ' ')}" aria-valuemin="-90" aria-valuemax="90" id="jm${k}"><div class="jthumb up" id="jt${k}"></div></div><span class="jval dn field" id="jv${k}">0.0</span></div>`).join('');
+  for (const [sel, def] of [['sig1', 'lat'], ['sig2', 'taup']]) {
+    $(sel).innerHTML = Object.entries(SIGNALS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join('');
+    $(sel).value = store.get(sel) || def; if (!SIGNALS[$(sel).value]) $(sel).value = def;
+    $(sel).onchange = () => { store.set(sel, $(sel).value); drawCharts(); };
+  }
+  // change-over table with the paper's Table 3 in brackets
+  const paper = { HP: { A: [200, 0, 0, -3], B: [90, 0, 0, -28], C: [55, 300, -15, 19], D: 'POS' }, HR: { A: 'POS', B: 'POS', C: [80, 0, 0, 0], D: 'POS' }, FP: { A: 'POS', B: [55, 280, 0, 0], C: [50, 300, 0, 0], D: [400, 800, 1, 28] }, FR: { A: 'POS', B: [80, 0, 0, 0], C: [250, 300, 12, -10], D: [70, 800, 12, 38] } };
+  const names = { HP: 'H.P. hind pitch', HR: 'H.R. hind roll', FP: 'F.P. front pitch', FR: 'F.R. front roll' };
+  let h = '<thead><tr><th scope="col">actuator</th><th scope="col"></th><th scope="col">A</th><th scope="col">B</th><th scope="col">C</th><th scope="col">D</th></tr></thead><tbody>';
+  for (const k of ['HP', 'HR', 'FP', 'FR']) ['VIS', 'ELA', 'NP', 'TRQ'].forEach((f, fi) => {
+    h += `<tr><td>${fi === 0 ? names[k] : ''}</td><td>${f}</td>`;
+    for (const ph of 'ABCD') {
+      const v = RUN.table && RUN.table[k] ? RUN.table[k][ph] : null, p = paper[k][ph];
+      const sv = v == null ? '—' : v === 'POS' ? (fi === 0 ? 'POS' : '') : (+v[fi]).toFixed(fi === 2 ? 1 : 0);
+      const sp = p === 'POS' ? (fi === 0 ? 'POS' : '') : String(p[fi]);
+      h += `<td>${sv}${sp !== '' && sp !== sv ? ` <span class="paper">(${sp})</span>` : ''}</td>`;
+    }
+    h += '</tr>';
+  });
+  $('tbl').innerHTML = h + '</tbody>';
+}
+
+// ---------------- charts
+function setupCanvas(c) {
+  const r = c.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.max(1, Math.round(r.width * dpr)); c.height = Math.max(1, Math.round(r.height * dpr));
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return [ctx, r.width, r.height];
+}
+function niceTicks(lo, hi, n) {
+  const span = hi - lo, mag = Math.pow(10, Math.floor(Math.log10(span / n)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
+  const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(6)); return out;
+}
+function axes(ctx, w, h, pad, x0, x1, y0, y1, xl, yl) {
+  const X = v => pad.l + (v - x0) / (x1 - x0) * (w - pad.l - pad.r), Y = v => h - pad.b - (v - y0) / (y1 - y0) * (h - pad.t - pad.b);
+  ctx.fillStyle = css('--field'); ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.fillStyle = css('--muted'); ctx.font = '11px ' + css('--f-mono');
+  for (const v of niceTicks(x0, x1, Math.max(3, Math.floor(w / 80)))) { ctx.beginPath(); ctx.moveTo(X(v), pad.t); ctx.lineTo(X(v), h - pad.b); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(String(+v.toFixed(3)), X(v), h - pad.b + 13); }
+  for (const v of niceTicks(y0, y1, 4)) { ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(w - pad.r, Y(v)); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(String(+v.toFixed(3)), pad.l - 5, Y(v) + 4); }
+  ctx.strokeStyle = css('--muted'); ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, w - pad.l - pad.r - 1, h - pad.t - pad.b - 1);
+  ctx.textAlign = 'right'; ctx.fillText(xl, w - pad.r, h - 3);
+  if (yl) { ctx.textAlign = 'left'; ctx.fillText(yl, pad.l + 5, pad.t + 13); }
+  return [X, Y];
+}
+function line(ctx, X, Y, n, fx, fy, colour, width, dash, from, to) {
+  ctx.strokeStyle = colour; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath(); let pen = false;
+  for (let i = from || 0; i <= (to == null ? n - 1 : to); i++) { const x = fx(i), y = fy(i); if (y == null || Number.isNaN(y) || x == null) { pen = false; continue; } if (!pen) { ctx.moveTo(X(x), Y(y)); pen = true; } else ctx.lineTo(X(x), Y(y)); }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+const STY = () => [[css('--s1'), 2.2, []], [css('--s2'), 1.4, [5, 3]]];
+function keyHtml(sig) {
+  return SIGNALS[sig].series.map(([n], k) => `<span class="key"><svg width="24" height="6" aria-hidden="true"><path d="M0 3 H24" style="stroke:var(--s${k + 1})" stroke-width="${k ? 1.5 : 2.5}"${k ? ' stroke-dasharray="4 2"' : ''}/></svg>${n}</span>`).join('');
+}
+const chartPad = { l: 46, r: 8, t: 8, b: 32 };
+function drawSignal(canvas, sig) {
+  const [ctx, w, h] = setupCanvas(canvas); const sp = SIGNALS[sig], n = S.t.length;
+  let [y0, y1] = sp.range || [Infinity, -Infinity];
+  if (!sp.range) { for (const [, f] of sp.series) for (let i = 0; i < n; i += 3) { const v = f(i); if (v != null) { y0 = Math.min(y0, v); y1 = Math.max(y1, v); } } const m = (y1 - y0) * 0.08 || 0.1; y0 -= m; y1 += m; }
+  const [X, Y] = axes(ctx, w, h, chartPad, T0, T1, y0, y1, 't (s)');
+  const sty = STY(), i = idxAt(cur);
+  if (sp.range && sp.range[1] === 110) { ctx.strokeStyle = css('--muted'); ctx.setLineDash([2, 3]); [-100, 100].forEach(v => { ctx.beginPath(); ctx.moveTo(chartPad.l, Y(v)); ctx.lineTo(w - chartPad.r, Y(v)); ctx.stroke(); }); ctx.setLineDash([]); }
+  sp.series.forEach(([, f], k) => line(ctx, X, Y, n, j => S.t[j], f, sty[k][0], sty[k][2].length ? 1.2 : 1.8, sty[k][2]));
+  ctx.strokeStyle = css('--fg'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(S.t[i]), chartPad.t); ctx.lineTo(X(S.t[i]), h - chartPad.b); ctx.stroke();
+  canvas.setAttribute('aria-label', `${sp.label} against time; cursor at ${cur.toFixed(2)} s`);
+}
+function drawPlan(i) {
+  const c = $('cPlan'); if (c.closest('.win').hidden) return;
+  const [ctx, w, h] = setupCanvas(c);
+  const xs = S.com.map(v => v[0]), x0 = Math.min(...xs) - 0.25, x1 = Math.max(...xs) + 0.25;
+  const yr = Math.max(0.3, (x1 - x0) * (h - 28) / (w - 54) / 2);
+  const [X, Y] = axes(ctx, w, h, chartPad, x0, x1, -yr, yr, 'x (m)', 'y (m)');
+  ctx.strokeStyle = css('--fg'); ctx.lineWidth = 1;
+  for (const p of prints) if (p[3] <= S.t[i]) ctx.strokeRect(X(p[0] - 0.14), Y(p[1] + 0.07), X(p[0] + 0.14) - X(p[0] - 0.14), Y(p[1] - 0.07) - Y(p[1] + 0.07));
+  const sty = STY();
+  line(ctx, X, Y, S.t.length, j => S.zmp[j] ? S.zmp[j][0] : null, j => S.zmp[j] ? S.zmp[j][1] : null, sty[1][0], 1.1, sty[1][2], 0, i);
+  line(ctx, X, Y, S.t.length, j => S.com[j][0], j => S.com[j][1], sty[0][0], 2, [], 0, i);
+  ctx.fillStyle = sty[0][0]; ctx.beginPath(); ctx.arc(X(S.com[i][0]), Y(S.com[i][1]), 4, 0, 7); ctx.fill();
+}
+function drawPhase(i) {
+  const c = $('cPhase'); if (c.closest('.win').hidden) return;
+  const [ctx, w, h] = setupCanvas(c);
+  const all = coRuns.flatMap(r => r.pts.map(p => [S.com[p[0]][0] - S.com[r.i0][0], p[1]]));
+  if (!all.length) return;
+  const x1 = Math.max(0.3, ...all.map(a => a[0])) + 0.02, v1 = Math.max(0.6, ...all.map(a => a[1])) + 0.1, v0 = Math.min(0, ...all.map(a => a[1]));
+  const [X, Y] = axes(ctx, w, h, chartPad, 0, x1, v0, v1, 'CoM advance since start of A (m)', 'forward CoM speed (m/s)');
+  for (const r of coRuns) for (let k = 1; k < r.pts.length; k++) {
+    const [ii, v, ph] = r.pts[k]; if (ii > i) break; const [ip, vp] = r.pts[k - 1];
+    ctx.strokeStyle = css('--ph-' + phKey(ph)); ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(X(S.com[ip][0] - S.com[r.i0][0]), Y(vp)); ctx.lineTo(X(S.com[ii][0] - S.com[r.i0][0]), Y(v)); ctx.stroke();
+  }
+}
+function drawCharts() {
+  if (!S) return; const i = idxAt(cur);
+  if (!W('strip').hidden) { drawSignal($('c1'), $('sig1').value); drawSignal($('c2'), $('sig2').value); $('key1').innerHTML = keyHtml($('sig1').value); $('key2').innerHTML = keyHtml($('sig2').value); }
+  drawPlan(i); drawPhase(i);
+}
+for (const id of ['c1', 'c2']) {
+  const c = $(id); let drag = false;
+  const seek = e => { const r = c.getBoundingClientRect(); const f = (e.clientX - r.left - chartPad.l) / (r.width - chartPad.l - chartPad.r); cur = clamp(T0 + f * (T1 - T0)); playing = false; syncPlay(); update(); };
+  c.addEventListener('pointerdown', e => { drag = true; c.setPointerCapture(e.pointerId); seek(e); });
+  c.addEventListener('pointermove', e => { if (drag) seek(e); });
+  c.addEventListener('pointerup', () => { drag = false; });
+}
+
+// ---------------- per-frame update
+let chartTick = 0;
+function update() {
+  if (!S) return;
+  const i = idxAt(cur), fr = F[frameAt(cur)].p;
+  for (let b = 0; b < RUN.nbody && b < bodies.length; b++) { const o = b * 7; bodies[b].position.set(fr[o], fr[o + 1], fr[o + 2]); bodies[b].quaternion.set(fr[o + 4], fr[o + 5], fr[o + 6], fr[o + 3]); }
+  const c = S.com[i], z = S.zmp[i];
+  comMark.position.set(c[0], c[1], c[2]); comDrop.position.set(c[0], c[1], c[2] / 2); comDrop.scale.set(1, c[2], 1);
+  zmpMark.visible = show.zmp && !!z; if (z) zmpMark.position.set(z[0], z[1], 0.03);
+  comTrail.geometry.setDrawRange(0, Math.floor(i / 2)); zmpTrail.geometry.setDrawRange(0, Math.floor(i / 2));
+  printGroup.children.forEach(l => l.visible = l.userData.t <= S.t[i]);
+  if (view === 'follow' || view === 'top') { const p = S.pelvis[i]; const dx = p[0] - controls.target.x; controls.target.x += dx; camera.position.x += dx; }
+
+  const ph = S.phase[i], inPh = S.t[i] - S.t[phStart[i]];
+  const aEv = RUN.events.filter(e => e[1].startsWith('A_') && e[0] <= cur + 1e-6), nCO = RUN.events.filter(e => e[1].startsWith('A_')).length;
+  const lastA = aEv[aEv.length - 1], front = lastA ? lastA[1].split('->')[1] : null, rear = lastA ? lastA[1].slice(2, 3) : null;
+  const inCO = ph.length === 1 && 'ABCD'.includes(ph);
+  $('hudL').innerHTML = `<b>${esc(PHNAME[ph] || ph)}</b><br>${inCO ? `change-over ${aEv.length}/${nCO} · ${rear} → ${front}` : ph === 'SS' ? 'program control' : ''}`;
+  $('hudR').innerHTML = `t = ${cur.toFixed(3)} s<br>${view}`;
+  $('msg').textContent = `${PHNAME[ph] || ph} for ${inPh.toFixed(3)} s${inCO ? ` · change-over ${aEv.length} of ${nCO} (${rear} → ${front})` : ''} · ${RUN.fail ? 'run fell: ' + RUN.fail : 'walk completed at ' + T1.toFixed(3) + ' s'}`;
+  const tv = (cur - T0) / (T1 - T0);
+  $('scrub').value = Math.round(tv * 10000); $('scrubVal').textContent = cur.toFixed(3); $('scrubVal').style.left = `calc(${tv * 100}% + ${(0.5 - tv) * 30}px)`;
+  $('stripCur').style.left = (tv * 100) + '%';
+  $('fpTime').textContent = cur.toFixed(3); $('fpPhase').textContent = ph.length === 1 || ph === 'SS' ? ph : ph.slice(0, 5);
+
+  document.querySelectorAll('#radios .radio').forEach(r => { const on = r.dataset.ph === ph; r.classList.toggle('on', on); r.setAttribute('aria-current', String(on)); });
+  $('coInfo').innerHTML = inCO ? `Change-over ${aEv.length} of ${nCO}, ${rear} → ${front}<br>In ${ph} for ${inPh.toFixed(3)} s` : `${esc(PHNAME[ph] || ph)} for ${inPh.toFixed(3)} s`;
+  const sw = S.sw[i]; SW.forEach((k, j) => document.querySelector(`[data-sw="${k}"]`).classList.toggle('on', sw[j] === '1'));
+  const cnt = s => [...(s === 'L' ? sw.slice(0, 4) : sw.slice(4))].filter(x => x === '1').length;
+  for (const s of ['L', 'R']) {
+    const role = inCO ? (s === front ? ' front' : ' rear') : '';
+    $('footLab-' + s).innerHTML = `<b>${s}</b>${role}, ${cnt(s)}/4`;
+    $('sole' + s).setAttribute('aria-label', `${s} sole: ` + SW.filter(k => k[0] === s).map(k => `${k.slice(2).replace('_', ' ')} ${sw[SW.indexOf(k)] === '1' ? 'on' : 'off'}`).join(', '));
+  }
+  const dmax = RUN.design && RUN.design.D_max;
+  $('dend').innerHTML = ph === 'D'
+    ? `<b style="grid-column:1/-1">Phase D end conditions</b><span>all 4 front spikes (${front})</span><b>${cnt(front) === 4 ? '✓' : '✗'} ${cnt(front)}/4</b><span>time-out D_max${dmax ? ' ' + dmax.toFixed(2) + ' s' : ''}</span><b>${inPh.toFixed(3)} s</b><span class="small" style="grid-column:1/-1">The ankle-angle and roll conditions are not in run.json.</span>`
+    : `<b style="grid-column:1/-1">Phase D end conditions</b><span class="small" style="grid-column:1/-1">Shown during phase D: front spikes loaded and time against the D_max time-out.</span>`;
+  const q = S.q[i], g = n => q[J[n]];
+  const rows = [
+    ['pelvis x y z', S.pelvis[i].map(v => v.toFixed(3)).join(' ')], ['CoM x y z', c.map(v => v.toFixed(3)).join(' ')],
+    ['ZMP x y', z ? z.map(v => v.toFixed(3)).join(' ') : 'airborne'],
+    ['ankle pitch L R', fmtA(g('L_ankle_pitch')) + ' ' + fmtA(g('R_ankle_pitch'))], ['ankle roll L R', fmtA(g('L_ankle_roll')) + ' ' + fmtA(g('R_ankle_roll'))],
+    ['knee L R', fmtA(g('L_knee')) + ' ' + fmtA(g('R_knee'))],
+    ['τ pitch L R (N·m)', S.tau_ankle[i][0].toFixed(1) + ' ' + S.tau_ankle[i][2].toFixed(1)], ['τ roll L R (N·m)', S.tau_ankle[i][1].toFixed(1) + ' ' + S.tau_ankle[i][3].toFixed(1)]
+  ];
+  $('readout').innerHTML = rows.map(([k, v]) => `<tr><th scope="row">${k}</th><td>${v}</td></tr>`).join('');
+  if (!W('joints').hidden) RUN.joint_names.forEach((n, k) => {
+    const v = q[k], pos = Math.max(0, Math.min(100, (v + 90) / 180 * 100));
+    $('jt' + k).style.left = pos + '%'; $('jv' + k).textContent = fmtA(v).replace('°', ''); $('jm' + k).setAttribute('aria-valuenow', v.toFixed(1));
+  });
+  if (!playing || ++chartTick % 3 === 0) drawCharts();
+}
+const fmtA = v => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(1) + '°';
+
+$('scrub').oninput = () => { cur = T0 + $('scrub').value / 10000 * (T1 - T0); playing = false; syncPlay(); update(); };
+function loop(ts) {
+  if (playing && S) {
+    if (last != null) { cur += (ts - last) / 1000 * parseFloat($('speed').value); if (cur >= T1) { cur = T1; playing = false; syncPlay(); } update(); }
+    last = ts;
+  } else last = null;
+  controls.update(); renderer.render(scene, camera); drawTriad(); requestAnimationFrame(loop);
+}
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { resize(); drawCharts(); }, 100); });
+
+function load(run) {
+  if (!run || !run.series || !run.frames || !run.geoms) throw new Error('missing series, frames or geoms');
+  RUN = run; S = RUN.series; F = RUN.frames; T0 = S.t[0]; T1 = S.t[S.t.length - 1];
+  buildDerived(); buildStatic(); buildStrip(); buildScene();
+  const firstA = RUN.events.find(e => e[1].startsWith('A_'));
+  cur = firstA ? firstA[0] + 0.12 : T0; playing = false; syncPlay();
+  setView(view); update(); drawCharts();
+}
+
+applyTheme(); layout();
+try { load(JSON.parse($('run-data').textContent)); }
+catch (err) { dialog('No run data', `<p style="margin:0">This page has no embedded run. Use File → Open run.json… to load one written by <code>python -m wl10rd_sim.run_walk</code>.</p>`); }
+resize(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

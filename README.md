@@ -27,11 +27,14 @@ python -m wl10rd_sim.run_walk --out out     # tuned design: 4 change-overs, 5 si
                                             # (a copy of this output is in examples/)
 ```
 
-This writes three things to `out/`:
+This writes four things to `out/`:
 
 * `run.json`: the time series.
 * `viewer.html`: a self-contained 3D replay with charts. It needs an internet connection to load
   three.js.
+* `viewer_motif.html` (prototype): the same replay as a CDE/Motif-style workspace, in GitHub's
+  Primer colours with light and dark themes. It adds a joint panel, a change-over monitor, selectable
+  strip charts, workspaces, keyboard shortcuts (press `?`) and File → Open for any `run.json`.
 * `plots/`: black-and-white figures, including `paper_comparison` (simulation vs the paper's Fig. 8
   and Fig. 12).
 
@@ -49,7 +52,7 @@ open problems for anyone, or any agent, continuing the work).
 | `paper_data/fig12_digitized.json` | the paper's Fig. 12, digitized from the scan, with how it was read |
 | `sim.py` | walker: stand/shift, single support, change-over A–D, stop step, settling |
 | `tune.py` | CMA-ES searches: pattern ZMP margin and hand-over states, change-over table, stop step |
-| `export.py`, `plots.py`, `viewer_template.html`, `run_walk.py` | output |
+| `export.py`, `plots.py`, `viewer_template.html`, `viewer_motif_template.html`, `run_walk.py` | output |
 
 ## Sources used
 

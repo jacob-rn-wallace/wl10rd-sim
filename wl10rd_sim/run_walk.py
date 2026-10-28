@@ -5,6 +5,7 @@
 
 Writes  <out>/run.json      (time series, body poses, events)
         <out>/viewer.html   (self-contained 3D replay + charts; open in a browser)
+        <out>/viewer_motif.html (the same replay in a CDE/Motif-style workspace; prototype)
         <out>/plots/*.pdf|png (paper-style figures)
 """
 import argparse
@@ -18,8 +19,8 @@ from . import plots
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def build_viewer(run_json_path, html_path):
-    with open(os.path.join(HERE, 'viewer_template.html')) as f:
+def build_viewer(run_json_path, html_path, template='viewer_template.html'):
+    with open(os.path.join(HERE, template)) as f:
         tpl = f.read()
     with open(run_json_path) as f:
         data = f.read().replace('</', '<\\/')
@@ -38,6 +39,7 @@ def main():
     p = os.path.join(a.out, 'run.json')
     run = run_to_json(w, p, fps=50, title='WL-10RD simulation')
     build_viewer(p, os.path.join(a.out, 'viewer.html'))
+    build_viewer(p, os.path.join(a.out, 'viewer_motif.html'), 'viewer_motif_template.html')
     print(plots.plot_all(run, os.path.join(a.out, 'plots')))
     print('events:', [(round(t, 2), e) for t, e in w.events])
 

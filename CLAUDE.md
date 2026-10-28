@@ -32,7 +32,8 @@ wl10rd_sim/                  the package (run from the repo root: python -m wl10
   tune.py                    CMA-ES searches (patterns, change-over table, robust variant, stop step) + cost functions
   export.py, plots.py        run -> JSON for the viewer; paper-style PDFs/PNGs incl. paper_comparison (Figs. 8 and 12)
   viewer_template.html       standalone three.js viewer; run_walk.py fills the __RUN_DATA__ placeholder
-  run_walk.py                CLI: run a walk -> out/run.json, out/viewer.html, out/plots/
+  viewer_motif_template.html prototype CDE/Motif-style viewer (GitHub Primer colours), same placeholder and data
+  run_walk.py                CLI: run a walk -> out/run.json, out/viewer.html, out/viewer_motif.html, out/plots/
   designs/tuned.json         the current tuned design (FULL float precision; never round it)
   paper_data/fig12_digitized.json  paper Fig. 12 digitized from the scan, with the reading notes
 scripts/                     CLI drivers for tuning and checks (thin wrappers over wl10rd_sim.tune)
@@ -60,7 +61,8 @@ parallel if there are cores. All designs are JSON: `design.load()` / `design.sav
 - `examples/` was regenerated (`python -m wl10rd_sim.run_walk --out examples`, then delete `examples/run.json`,
   which is large);
 - the README "Results" and "Fragility" sections were updated with the real numbers;
-- the notes panel in `viewer_template.html` ("What is from the paper and what is not") still matches.
+- the notes panel in `viewer_template.html` and the Notes window in `viewer_motif_template.html`
+  ("What is from the paper and what is not") still match.
 
 ## How the walk runs (`Walker.run`)
 
