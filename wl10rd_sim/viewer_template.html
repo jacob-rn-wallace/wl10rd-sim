@@ -1,0 +1,462 @@
+<title>WL-10RD Walking Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: chart-recorder bench — a replay stage on the left, instrument panels on the right, recorder strips below. */
+:root {
+  --paper: #eef1f3;      /* grid paper */
+  --panel: #f8f9fa;
+  --ink: #18222c;
+  --ink-2: #4c5a67;
+  --rule: #cdd5dc;
+  --grid: #dde3e8;
+  --accent: #b2451f;     /* recorder pen red (ZMP) */
+  --blue: #1f5fa8;       /* second pen (CoM) */
+  --ph-ss: #8a97a3; --ph-a: #d08a2e; --ph-b: #c25a3a; --ph-c: #3c8a6e; --ph-d: #3d6fb0; --ph-st: #b8c1c9;
+  --on: #18222c; --off: transparent;
+  --stage-top: #e7ebef; --stage-bot: #d6dde3; --floor: #c9d1d8; --floorline: #b6c0c9;
+  --f-display: "Archivo Narrow", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #121a22; --panel: #18222c; --ink: #e3e9ee; --ink-2: #9eacb8; --rule: #2c3a47; --grid: #223040;
+  --accent: #ec7a52; --blue: #6fa6e8;
+  --ph-ss: #6c7a87; --ph-a: #e0a24a; --ph-b: #e07656; --ph-c: #5cb593; --ph-d: #6c9ad6; --ph-st: #44525f;
+  --on: #e3e9ee; --stage-top: #1b2631; --stage-bot: #111920; --floor: #26323e; --floorline: #33414e;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #121a22; --panel: #18222c; --ink: #e3e9ee; --ink-2: #9eacb8; --rule: #2c3a47; --grid: #223040;
+  --accent: #ec7a52; --blue: #6fa6e8;
+  --ph-ss: #6c7a87; --ph-a: #e0a24a; --ph-b: #e07656; --ph-c: #5cb593; --ph-d: #6c9ad6; --ph-st: #44525f;
+  --on: #e3e9ee; --stage-top: #1b2631; --stage-bot: #111920; --floor: #26323e; --floorline: #33414e;
+  color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 32px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(26px, 4vw, 36px); letter-spacing: 0.01em; margin: 0; text-wrap: balance }
+h1 small { font-weight: 500; color: var(--ink-2); font-size: 0.55em; letter-spacing: 0.06em; text-transform: uppercase; margin-left: 10px }
+.sub { color: var(--ink-2); max-width: 70ch; margin: 2px 0 0 }
+.status { font-family: var(--f-mono); font-size: 12.5px; padding: 4px 10px; border: 1px solid var(--rule); background: var(--panel) }
+.status b { font-weight: 500 }
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px }
+@media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr) } }
+.stage { position: relative; background: linear-gradient(var(--stage-top), var(--stage-bot)); border: 1px solid var(--rule); min-height: 380px; aspect-ratio: 16 / 10; max-width: 100% }
+.stage canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block }
+.stage .hud { position: absolute; left: 12px; top: 10px; font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); pointer-events: none }
+.stage .hud .ph { font-family: var(--f-display); font-size: 30px; font-weight: 700; color: var(--ink); line-height: 1 }
+.stage .views { position: absolute; right: 10px; top: 10px; display: flex; gap: 4px }
+.panel { background: var(--panel); border: 1px solid var(--rule); padding: 12px 14px; display: grid; gap: 8px; min-width: 0 }
+.panel h2 { font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; color: var(--ink-2) }
+.side { display: grid; gap: 14px; align-content: start }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-family: var(--f-mono); font-size: 12.5px; font-variant-numeric: tabular-nums }
+.kv dt { color: var(--ink-2) } .kv dd { margin: 0; text-align: right }
+button, select { font: inherit; font-family: var(--f-mono); font-size: 12.5px; color: var(--ink); background: var(--panel); border: 1px solid var(--rule); padding: 5px 10px; cursor: pointer }
+button:hover { border-color: var(--ink-2) } button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px }
+button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink) }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px }
+.transport input[type=range] { flex: 1 1 260px; accent-color: var(--accent); min-width: 0 }
+.clock { font-family: var(--f-mono); font-variant-numeric: tabular-nums; min-width: 8ch }
+.strip { position: relative; height: 26px; border: 1px solid var(--rule); background: var(--panel); overflow: hidden }
+.strip .seg { position: absolute; top: 0; bottom: 0 }
+.strip .cursor { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink) }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--ink-2) }
+.legend i { display: inline-block; width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px }
+.feet { display: flex; justify-content: center; gap: 26px }
+.foot { width: 64px; height: 120px; border: 1.5px solid var(--ink-2); border-radius: 10px 10px 14px 14px; position: relative }
+.foot span { position: absolute; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--ink-2); background: var(--off); transform: translate(-50%, -50%); transition: background .05s }
+.foot span.on { background: var(--on); border-color: var(--on) }
+.foot b { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-family: var(--f-mono); font-weight: 500; font-size: 12px; color: var(--ink-2) }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px }
+.chart { width: 100%; height: 220px; display: block }
+.note { font-size: 12.5px; color: var(--ink-2); max-width: 75ch }
+.tbl { overflow-x: auto }
+table { border-collapse: collapse; font-family: var(--f-mono); font-size: 12px; font-variant-numeric: tabular-nums; width: 100% }
+th, td { padding: 4px 8px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left }
+thead th { font-family: var(--f-body); font-weight: 600; color: var(--ink-2) }
+td.paper { color: var(--ink-2) }
+@media (prefers-reduced-motion: reduce) { .foot span { transition: none } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>WL-10RD Walking Simulator <small>Takanishi et al. 1985 · MuJoCo replay</small></h1>
+      <p class="sub" id="subtitle">Complete walking from standing: weight shift, single-support steps under program control, and four-phase change-overs under ankle impedance control.</p>
+    </div>
+    <div class="status" id="status"></div>
+  </header>
+
+  <div class="bench">
+    <div class="stage" id="stage">
+      <div class="hud"><div class="ph" id="hudPhase">—</div><div id="hudInfo"></div></div>
+      <div class="views">
+        <button id="vFollow" aria-pressed="true">Follow</button>
+        <button id="vSide">Side</button>
+        <button id="vFront">Front</button>
+      </div>
+    </div>
+    <div class="side">
+      <section class="panel">
+        <h2>Sole switches</h2>
+        <div class="feet">
+          <div class="foot" id="footL"><b>Left</b></div>
+          <div class="foot" id="footR"><b>Right</b></div>
+        </div>
+        <p class="note" style="margin-top:18px">Four spikes per sole, toe and heel, each on a micro switch (paper §4.1). Filled = in contact. Phases A–C end on these signals.</p>
+      </section>
+      <section class="panel">
+        <h2>Readout</h2>
+        <dl class="kv" id="readout"></dl>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="transport">
+      <button id="play" aria-pressed="false">Play</button>
+      <select id="speed" aria-label="Playback speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+      <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Time">
+      <span class="clock" id="clock">0.00 s</span>
+    </div>
+    <div class="strip" id="strip"><div class="cursor" id="cursor"></div></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <div class="charts">
+    <section class="panel"><h2>Footprints, CoM and ZMP (plan view)</h2><canvas class="chart" id="cPlan" style="height:260px"></canvas>
+      <p class="note">Like the paper's Fig. 12: sole rectangles drawn at each footstep, centre of mass (blue) and measured ZMP from the spike forces (red).</p></section>
+    <section class="panel"><h2>Change-over phase plane</h2><canvas class="chart" id="cPhase" style="height:260px"></canvas>
+      <p class="note">After Fig. 8: forward CoM speed against CoM distance from the rear ankle, one trace per change-over, coloured by phase.</p></section>
+    <section class="panel"><h2>CoM and ZMP, lateral (y)</h2><canvas class="chart" id="cLat"></canvas></section>
+    <section class="panel"><h2>Ankle torques</h2><canvas class="chart" id="cTau"></canvas></section>
+  </div>
+
+  <section class="panel">
+    <h2>Change-over table used in this run</h2>
+    <div class="tbl"><table id="tbl"></table></div>
+    <p class="note">Values tuned in simulation, starting from the paper's Table 3 (in brackets). Set torques were kept within the paper's ±100 N·m ankle range, but several damping values (up to about 550 N·m·s/rad) are above what the paper reports for its actuators, so treat the table as one solution for the estimated model, not a reconstruction of the robot's.</p>
+    <p class="note">VIS N·m·s/rad, ELA N·m/rad, NP deg, TRQ N·m. POS = position control. H/F = hind/front ankle, P/R = pitch/roll. Roll values are mirrored per side (+ = hip outboard of the foot).</p>
+  </section>
+
+  <section class="panel">
+    <h2>What is from the paper and what is not</h2>
+    <div class="note" style="max-width:none; display:grid; gap:6px">
+      <p style="margin:0"><b>From the papers:</b> link lengths, hip spacing, foot size and total mass (83 kg); 40 cm steps with 1.0 s single support; straighter legs than before (Fig. 18, and Figs. 7 and 10 of the WL-10R paper show nearly straight support legs; in this model the knees still bend about 45° while walking, down from about 63° in the first version, because the legs must reach a 40 cm stance); the CoM path over the sole in single support (Fig. 12, digitized); the three-state, sixth-order joint pattern with start and end acceleration, checked by ZMP; the tracking mode of Eq. 45 (sign corrected); four change-over phases switched by four micro switches per sole and the front ankle angle; ankle impedance control of Eq. 33 within ±100 N·m.</p>
+      <p style="margin:0"><b>Estimated:</b> the mass of every link (55 kg above the hips, 14 kg per leg, chosen so the CoM sits about 0.77 m above the ankle axis, as Figs. 8 and 12 together imply); servo stiffness; spike positions; switch threshold. The papers give none of these.</p>
+      <p style="margin:0"><b>Changed to make it walk:</b> hip and knee joints follow the measured pelvis during the change-over so the feet stay on their footprints (the paper says these joints do not move); the hind ankle roll is compliant in A and B; phase D also waits for the front ankle roll and a flat front foot, with a 0.35 s time-out; the stop step sets the swing foot down beside the support foot while the body is still moving, then settles in double support (the paper does not say how its walks stop). The change-over table and the patterns were tuned by search in this simulation.</p>
+      <p style="margin:0"><b>Result vs paper:</b> each change-over takes about 0.8 s, not 0.5 s, and phase D always ends on the time-out rather than the ankle-angle trigger. For most of each single-support phase the support foot is loaded on its outer edge, not on all four spikes. The CoM enters single support about 3 cm further inboard than Fig. 12. This 4-change-over walk completes, but a 5th change-over fails, and an extra 0.02 m/s of sideways velocity at the start makes it fall, so the solution is fragile.</p>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script id="run-data" type="application/json">__RUN_DATA__</script>
+<script>
+(function () {
+const RUN = JSON.parse(document.getElementById('run-data').textContent);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const S = RUN.series, F = RUN.frames;
+const T0 = S.t[0], T1 = S.t[S.t.length - 1];
+const PH = { SS: '--ph-ss', A: '--ph-a', B: '--ph-b', C: '--ph-c', D: '--ph-d', stand: '--ph-st', shift: '--ph-st', land: '--ph-st', settle: '--ph-st' };
+const PHNAME = { SS: 'Single support', A: 'Phase A', B: 'Phase B', C: 'Phase C', D: 'Phase D', stand: 'Standing', shift: 'Weight shift', land: 'Landing', settle: 'Settling' };
+
+// ---------- status
+const nCO = RUN.events.filter(e => e[1].startsWith('A_')).length;
+document.getElementById('status').innerHTML = RUN.fail
+  ? `<b>Fell</b> · ${RUN.fail} · ${nCO} change-overs`
+  : `<b>Completed</b> · ${nCO} steps · ${(T1 - T0).toFixed(1)} s`;
+
+// ---------- index helpers
+function idxAt(t) { let lo = 0, hi = S.t.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (S.t[m] <= t) lo = m; else hi = m - 1; } return lo; }
+function frameAt(t) { let lo = 0, hi = F.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (F[m].t <= t) lo = m; else hi = m - 1; } return lo; }
+
+// ---------- phase strip
+const strip = document.getElementById('strip');
+function buildStrip() {
+  strip.querySelectorAll('.seg').forEach(e => e.remove());
+  let start = 0;
+  for (let i = 1; i <= S.t.length; i++) {
+    if (i === S.t.length || S.phase[i] !== S.phase[start]) {
+      const el = document.createElement('div'); el.className = 'seg';
+      el.style.left = ((S.t[start] - T0) / (T1 - T0) * 100) + '%';
+      el.style.width = (((S.t[Math.min(i, S.t.length - 1)] - S.t[start]) / (T1 - T0)) * 100) + '%';
+      el.style.background = css(PH[S.phase[start]] || '--ph-st');
+      el.title = PHNAME[S.phase[start]] || S.phase[start];
+      strip.insertBefore(el, strip.firstChild); start = i;
+    }
+  }
+}
+const legend = document.getElementById('legend');
+legend.innerHTML = [['SS', 'Single support (program control)'], ['A', 'A: rear foot only'], ['B', 'B: front heel down'], ['C', 'C: both feet flat'], ['D', 'D: rear foot leaving'], ['stand', 'Stand / shift / settle']]
+  .map(([k, l]) => `<span><i style="background:var(${PH[k]})"></i>${l}</span>`).join('');
+
+// ---------- sole switches
+const spikePos = { toe_o: [0.82, 0.14], toe_i: [0.18, 0.14], heel_o: [0.82, 0.86], heel_i: [0.18, 0.86] };
+const swOrder = ['L_toe_o', 'L_toe_i', 'L_heel_o', 'L_heel_i', 'R_toe_o', 'R_toe_i', 'R_heel_o', 'R_heel_i'];
+const swEls = {};
+for (const k of swOrder) {
+  const [side, ...rest] = k.split('_'); const nm = rest.join('_');
+  const el = document.createElement('span'); const p = spikePos[nm];
+  const x = side === 'L' ? 1 - p[0] : p[0];   // outer side faces away from the body
+  el.style.left = (x * 100) + '%'; el.style.top = (p[1] * 100) + '%';
+  document.getElementById('foot' + side).appendChild(el); swEls[k] = el;
+}
+
+// ---------- 3D stage
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1.6, 0.05, 60);
+camera.up.set(0, 0, 1);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(2, -3, 5); scene.add(sun);
+let floorMat, gridHelper;
+function buildFloor() {
+  if (floorMat) { scene.remove(scene.getObjectByName('floor')); scene.remove(gridHelper); }
+  floorMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(css('--floor')) });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 8), floorMat); floor.name = 'floor'; floor.position.set(5, 0, 0); scene.add(floor);
+  gridHelper = new THREE.GridHelper(30, 150, new THREE.Color(css('--floorline')), new THREE.Color(css('--floorline')));
+  gridHelper.rotation.x = Math.PI / 2; gridHelper.position.set(5, 0, 0.0005); scene.add(gridHelper);
+}
+buildFloor();
+const bodies = [];
+for (let b = 0; b < RUN.nbody; b++) { const g = new THREE.Group(); scene.add(g); bodies.push(g); }
+for (const g of RUN.geoms) {
+  if (g.body === 0) continue;
+  let geo;
+  if (g.type === 'box') geo = new THREE.BoxGeometry(2 * g.size[0], 2 * g.size[1], 2 * g.size[2]);
+  else if (g.type === 'cylinder') { geo = new THREE.CylinderGeometry(g.size[0], g.size[0], 2 * g.size[1], 24); geo.rotateX(Math.PI / 2); }
+  else geo = new THREE.SphereGeometry(g.size[0], 12, 8);
+  const mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(g.rgba[0], g.rgba[1], g.rgba[2]) });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(...g.pos); mesh.quaternion.set(g.quat[1], g.quat[2], g.quat[3], g.quat[0]);
+  bodies[g.body - 1].add(mesh);
+}
+// CoM / ZMP markers and trails
+const comMark = new THREE.Mesh(new THREE.SphereGeometry(0.025, 16, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--blue')) }));
+const comDrop = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 1, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--blue')) }));
+comDrop.rotation.x = Math.PI / 2;
+const zmpMark = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.004, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--accent')) }));
+zmpMark.rotation.x = Math.PI / 2;
+scene.add(comMark, comDrop, zmpMark);
+function trail(color, key, z) {
+  const pts = []; for (let i = 0; i < S.t.length; i += 2) { const v = S[key][i]; if (v) pts.push(new THREE.Vector3(v[0], v[1], z ?? 0.002)); }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: new THREE.Color(color) }));
+  scene.add(line); return line;
+}
+let comTrail = trail(css('--blue'), 'com'), zmpTrail = trail(css('--accent'), 'zmp', 0.003);
+let view = 'follow';
+function setView(v) {
+  view = v;
+  for (const [id, name] of [['vFollow', 'follow'], ['vSide', 'side'], ['vFront', 'front']]) document.getElementById(id).setAttribute('aria-pressed', String(name === v));
+  const p = S.pelvis[idxAt(cur)];
+  if (v === 'side') camera.position.set(p[0], p[1] - 4.2, 0.9);
+  else if (v === 'front') camera.position.set(p[0] + 4.2, p[1], 0.9);
+  else camera.position.set(p[0] + 2.2, p[1] - 3.0, 1.6);
+  controls.target.set(p[0], 0, 0.6); controls.update();
+}
+document.getElementById('vFollow').onclick = () => setView('follow');
+document.getElementById('vSide').onclick = () => setView('side');
+document.getElementById('vFront').onclick = () => setView('front');
+function resize() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+// ---------- 2D charts
+function setupCanvas(c) {
+  const r = c.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.max(1, r.width * dpr); c.height = Math.max(1, r.height * dpr);
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return [ctx, r.width, r.height];
+}
+function niceTicks(lo, hi, n) {
+  const span = hi - lo, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
+  const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(6)); return out;
+}
+function axes(ctx, W, H, pad, x0, x1, y0, y1, xl, yl) {
+  const X = v => pad.l + (v - x0) / (x1 - x0) * (W - pad.l - pad.r);
+  const Y = v => H - pad.b - (v - y0) / (y1 - y0) * (H - pad.t - pad.b);
+  ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.fillStyle = css('--ink-2'); ctx.font = '11px ' + css('--f-mono');
+  for (const v of niceTicks(x0, x1, 6)) { ctx.beginPath(); ctx.moveTo(X(v), pad.t); ctx.lineTo(X(v), H - pad.b); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(v.toFixed(Math.abs(v) < 1 && v !== 0 ? 2 : 1).replace(/\.?0+$/, '') || '0', X(v), H - pad.b + 14); }
+  for (const v of niceTicks(y0, y1, 4)) { ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(W - pad.r, Y(v)); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(String(+v.toFixed(3)), pad.l - 5, Y(v) + 4); }
+  ctx.strokeStyle = css('--ink-2'); ctx.strokeRect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b);
+  ctx.textAlign = 'center'; ctx.fillText(xl, (pad.l + W - pad.r) / 2, H - 3);
+  ctx.save(); ctx.translate(11, (pad.t + H - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(yl, 0, 0); ctx.restore();
+  return [X, Y];
+}
+function seriesLine(ctx, X, Y, xs, ys, color, upto, width) {
+  ctx.strokeStyle = color; ctx.lineWidth = width || 1.5; ctx.beginPath(); let pen = false;
+  for (let i = 0; i <= upto; i++) { const y = ys[i]; if (y == null || Number.isNaN(y)) { pen = false; continue; } if (!pen) { ctx.moveTo(X(xs[i]), Y(y)); pen = true; } else ctx.lineTo(X(xs[i]), Y(y)); }
+  ctx.stroke();
+}
+// footprints from contact: record each foot position when all 4 spikes are on (sample q from pelvis is not enough; use CoM-independent switch + stored foot pose from frames)
+const footBodies = {}; RUN.geoms.forEach(g => { if (g.spike) footBodies[g.body] = true; });
+const footIds = Object.keys(footBodies).map(Number); // two foot body ids (1-based in world list)
+const prints = [];
+if (RUN.supports && RUN.supports.length) {
+  prints.push([0, 0.13, 'L', 0], [0, -0.13, 'R', 0]);
+  for (const [t, side, a] of RUN.supports) if (!prints.some(p => Math.hypot(p[0] - a[0], p[1] - a[1]) < 0.05)) prints.push([a[0], a[1], side, t]);
+} else (function collectPrints() {
+  const last = {};
+  F.forEach((fr, k) => {
+    const i = idxAt(fr.t); const sw = S.sw[i];
+    footIds.forEach((bid, j) => {
+      const side = j === 0 ? 'L' : 'R'; const flat = side === 'L' ? sw.slice(0, 4) === '1111' : sw.slice(4) === '1111';
+      if (flat) {
+        const o = (bid - 1) * 7; const x = fr.p[o], y = fr.p[o + 1];
+        if (!last[side] || Math.hypot(x - last[side][0], y - last[side][1]) > 0.1) { prints.push([x, y, side, fr.t]); last[side] = [x, y]; }
+      }
+    });
+  });
+})();
+const planCanvas = document.getElementById('cPlan');
+function drawPlan(i) {
+  const [ctx, W, H] = setupCanvas(planCanvas); ctx.clearRect(0, 0, W, H);
+  const xs = S.com.map(c => c[0]); const xmin = Math.min(...xs) - 0.3, xmax = Math.max(...xs) + 0.3;
+  const yr = 0.3;
+  const [X, Y] = axes(ctx, W, H, { l: 44, r: 8, t: 8, b: 30 }, xmin, xmax, -yr, yr, 'x  [m]', 'y  [m]');
+  ctx.strokeStyle = css('--ink-2'); ctx.lineWidth = 1;
+  for (const p of prints) { if (p[3] > S.t[i]) continue; ctx.strokeRect(X(p[0] - 0.14), Y(p[1] + 0.07), X(p[0] + 0.14) - X(p[0] - 0.14), Y(p[1] - 0.07) - Y(p[1] + 0.07)); }
+  seriesLine(ctx, X, Y, xs, S.com.map(c => c[1]), css('--blue'), i, 1.6);
+  seriesLine(ctx, X, Y, S.zmp.map(z => z ? z[0] : null), S.zmp.map(z => z ? z[1] : null), css('--accent'), i, 1);
+  const c = S.com[i]; ctx.fillStyle = css('--blue'); ctx.beginPath(); ctx.arc(X(c[0]), Y(c[1]), 4, 0, 7); ctx.fill();
+  const z = S.zmp[i]; if (z) { ctx.fillStyle = css('--accent'); ctx.beginPath(); ctx.arc(X(z[0]), Y(z[1]), 3.5, 0, 7); ctx.fill(); }
+}
+// phase plane: per change-over, x = CoM x minus rear ankle x (approx: CoM x at A start minus offset), v = d/dt CoM x
+const coRuns = [];
+(function () {
+  let cur = null;
+  for (let i = 1; i < S.t.length; i++) {
+    const ph = S.phase[i];
+    if ('ABCD'.includes(ph) && ph.length === 1) {
+      if (!cur) { cur = { i0: i, pts: [] }; coRuns.push(cur); }
+      const v = (S.com[i][0] - S.com[i - 1][0]) / (S.t[i] - S.t[i - 1]);
+      cur.pts.push([i, v, ph]);
+    } else cur = null;
+  }
+  for (const r of coRuns) { const x0 = S.com[r.i0][0]; r.ref = x0; }
+})();
+// rear ankle x at A start ~ last footprint of the rear foot before i0
+const phaseCanvas = document.getElementById('cPhase');
+function drawPhase(i) {
+  const [ctx, W, H] = setupCanvas(phaseCanvas); ctx.clearRect(0, 0, W, H);
+  const all = coRuns.flatMap(r => r.pts.map(p => [S.com[p[0]][0] - S.com[r.i0][0], p[1]]));
+  if (!all.length) return;
+  const x1 = Math.max(0.3, ...all.map(a => a[0])) + 0.02, vmax = Math.max(0.6, ...all.map(a => a[1])) + 0.1, vmin = Math.min(0, ...all.map(a => a[1]));
+  const [X, Y] = axes(ctx, W, H, { l: 44, r: 8, t: 8, b: 30 }, 0, x1, vmin, vmax, 'CoM advance since start of A  [m]', 'CoM speed  [m/s]');
+  for (const r of coRuns) {
+    for (let k = 1; k < r.pts.length; k++) {
+      const [ii, v, ph] = r.pts[k]; if (ii > i) break;
+      const [ip, vp] = r.pts[k - 1];
+      ctx.strokeStyle = css(PH[ph]); ctx.lineWidth = 1.8; ctx.beginPath();
+      ctx.moveTo(X(S.com[ip][0] - S.com[r.i0][0]), Y(vp)); ctx.lineTo(X(S.com[ii][0] - S.com[r.i0][0]), Y(v)); ctx.stroke();
+    }
+  }
+}
+const latCanvas = document.getElementById('cLat');
+function drawLat(i) {
+  const [ctx, W, H] = setupCanvas(latCanvas); ctx.clearRect(0, 0, W, H);
+  const [X, Y] = axes(ctx, W, H, { l: 44, r: 8, t: 8, b: 30 }, T0, T1, -0.3, 0.3, 'time  [s]', 'y  [m]');
+  seriesLine(ctx, X, Y, S.t, S.com.map(c => c[1]), css('--rule'), S.t.length - 1, 1.2);
+  seriesLine(ctx, X, Y, S.t, S.zmp.map(z => z ? z[1] : null), css('--accent'), i, 1);
+  seriesLine(ctx, X, Y, S.t, S.com.map(c => c[1]), css('--blue'), i, 1.8);
+}
+const tauCanvas = document.getElementById('cTau');
+function drawTau(i) {
+  const [ctx, W, H] = setupCanvas(tauCanvas); ctx.clearRect(0, 0, W, H);
+  const [X, Y] = axes(ctx, W, H, { l: 44, r: 8, t: 8, b: 30 }, T0, T1, -200, 200, 'time  [s]', 'torque  [N·m]');
+  const cols = [css('--blue'), css('--ph-c'), css('--accent'), css('--ph-a')];
+  [0, 1, 2, 3].forEach(k => seriesLine(ctx, X, Y, S.t, S.tau_ankle.map(a => a[k]), css('--rule'), S.t.length - 1, 0.8));
+  ['L pitch', 'L roll', 'R pitch', 'R roll'].forEach((nm, k) => seriesLine(ctx, X, Y, S.t, S.tau_ankle.map(a => a[k]), cols[k], i, 1.1));
+  ctx.font = '11px ' + css('--f-mono'); ctx.textAlign = 'left'; ['L pitch', 'L roll', 'R pitch', 'R roll'].forEach((nm, k) => { ctx.fillStyle = cols[k]; ctx.fillText(nm, 60 + k * 70, 20); });
+}
+
+// ---------- table
+(function () {
+  const paper = { HP: { A: [200, 0, 0, -3], B: [90, 0, 0, -28], C: [55, 300, -15, 19], D: 'POS' }, HR: { A: 'POS', B: 'POS', C: [80, 0, 0, 0], D: 'POS' }, FP: { A: 'POS', B: [55, 280, 0, 0], C: [50, 300, 0, 0], D: [400, 800, 1, 28] }, FR: { A: 'POS', B: [80, 0, 0, 0], C: [250, 300, 12, -10], D: [70, 800, 12, 38] } };
+  const names = { HP: 'H.P. hind pitch', HR: 'H.R. hind roll', FP: 'F.P. front pitch', FR: 'F.R. front roll' };
+  const fields = ['VIS', 'ELA', 'NP', 'TRQ'];
+  let h = '<thead><tr><th>actuator</th><th></th><th>A</th><th>B</th><th>C</th><th>D</th></tr></thead><tbody>';
+  for (const k of ['HP', 'HR', 'FP', 'FR']) {
+    fields.forEach((f, fi) => {
+      h += `<tr><td>${fi === 0 ? names[k] : ''}</td><td>${f}</td>`;
+      for (const ph of 'ABCD') {
+        const v = RUN.table[k][ph], p = paper[k][ph];
+        const sv = v === 'POS' ? (fi === 0 ? 'POS' : '') : (+v[fi]).toFixed(fi === 2 ? 1 : 0);
+        const sp = p === 'POS' ? (fi === 0 ? 'POS' : '') : String(p[fi]);
+        h += `<td>${sv}${sp !== '' && sp !== sv ? ` <span class="paper">(${sp})</span>` : ''}</td>`;
+      }
+      h += '</tr>';
+    });
+  }
+  document.getElementById('tbl').innerHTML = h + '</tbody>';
+})();
+
+// ---------- playback
+const scrub = document.getElementById('scrub'), clock = document.getElementById('clock'), cursor = document.getElementById('cursor');
+const playBtn = document.getElementById('play');
+let cur = T0, playing = false, last = null;
+function update() {
+  const i = idxAt(cur);
+  const fi = frameAt(cur); const fr = F[fi].p;
+  for (let b = 0; b < RUN.nbody; b++) { const o = b * 7; bodies[b].position.set(fr[o], fr[o + 1], fr[o + 2]); bodies[b].quaternion.set(fr[o + 4], fr[o + 5], fr[o + 6], fr[o + 3]); }
+  const c = S.com[i]; comMark.position.set(c[0], c[1], c[2]); comDrop.position.set(c[0], c[1], c[2] / 2); comDrop.scale.set(1, c[2], 1);
+  const z = S.zmp[i]; zmpMark.visible = !!z; if (z) zmpMark.position.set(z[0], z[1], 0.003);
+  comTrail.geometry.setDrawRange(0, Math.floor(i / 2)); zmpTrail.geometry.setDrawRange(0, Math.floor(i / 2));
+  const ph = S.phase[i];
+  document.getElementById('hudPhase').textContent = PHNAME[ph] || ph;
+  document.getElementById('hudPhase').style.color = css(PH[ph] || '--ink');
+  document.getElementById('hudInfo').textContent = `t = ${cur.toFixed(2)} s`;
+  const sw = S.sw[i]; swOrder.forEach((k, j) => swEls[k].classList.toggle('on', sw[j] === '1'));
+  const q = S.q[i]; const jn = RUN.joint_names;
+  const get = n => q[jn.indexOf(n)];
+  document.getElementById('readout').innerHTML = [
+    ['Pelvis x, y, z', S.pelvis[i].map(v => v.toFixed(3)).join(', ') + ' m'],
+    ['CoM height', c[2].toFixed(3) + ' m'],
+    ['ZMP', z ? z.map(v => v.toFixed(3)).join(', ') + ' m' : 'airborne'],
+    ['Ankle pitch L / R', get('L_ankle_pitch').toFixed(1) + ' / ' + get('R_ankle_pitch').toFixed(1) + '°'],
+    ['Ankle roll L / R', get('L_ankle_roll').toFixed(1) + ' / ' + get('R_ankle_roll').toFixed(1) + '°'],
+    ['Knee L / R', get('L_knee').toFixed(1) + ' / ' + get('R_knee').toFixed(1) + '°'],
+    ['Ankle torque L (p, r)', S.tau_ankle[i][0].toFixed(0) + ', ' + S.tau_ankle[i][1].toFixed(0) + ' N·m'],
+    ['Ankle torque R (p, r)', S.tau_ankle[i][2].toFixed(0) + ', ' + S.tau_ankle[i][3].toFixed(0) + ' N·m'],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  scrub.value = Math.round((cur - T0) / (T1 - T0) * 1000);
+  clock.textContent = cur.toFixed(2) + ' s';
+  cursor.style.left = ((cur - T0) / (T1 - T0) * 100) + '%';
+  if (view === 'follow') { const p = S.pelvis[i]; const dx = p[0] - controls.target.x; controls.target.x += dx; camera.position.x += dx; }
+  drawPlan(i); drawPhase(i); drawLat(i); drawTau(i);
+}
+scrub.oninput = () => { cur = T0 + scrub.value / 1000 * (T1 - T0); update(); };
+playBtn.onclick = () => { playing = !playing; playBtn.setAttribute('aria-pressed', String(playing)); playBtn.textContent = playing ? 'Pause' : 'Play'; if (playing && cur >= T1) cur = T0; last = null; };
+function loop(ts) {
+  if (playing) { if (last != null) { cur += (ts - last) / 1000 * parseFloat(document.getElementById('speed').value); if (cur >= T1) { cur = T1; playing = false; playBtn.textContent = 'Play'; playBtn.setAttribute('aria-pressed', 'false'); } update(); } last = ts; }
+  controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop);
+}
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+const refreshTheme = () => { buildStrip(); buildFloor(); update(); };
+mq.addEventListener?.('change', refreshTheme);
+new MutationObserver(refreshTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+window.addEventListener('resize', () => update());
+buildStrip(); resize();
+// open at the middle of the first change-over so the first frame shows the method at work
+const firstA = RUN.events.find(e => e[1].startsWith('A_'));
+cur = firstA ? firstA[0] + 0.12 : T0;
+setView('follow'); update();
+requestAnimationFrame(loop);
+})();
+</script>

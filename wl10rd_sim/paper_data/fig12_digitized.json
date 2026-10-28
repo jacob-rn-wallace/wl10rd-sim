@@ -1,0 +1,11 @@
+{
+ "source": "Takanishi et al. 1985, Fig. 12 (computed CoM and ZMP in single support, right sole), digitized from the 600 dpi scan",
+ "frame": "mm relative to the centre of the 'stable region of right sole' rectangle (taken as the 140 x 280 mm sole; ankle assumed at its centre); x forward, 'inboard' toward the other foot",
+ "orientation_note": "forward = up in the figure. Inferred, not labelled: CoM markers are evenly spaced in time and dense at one end; Fig. 8 shows the change-over ending slow and starting fast, so the dense end is the start of single support.",
+ "scale_px_per_mm": 4.27,
+ "com_start": {"x": -8.5, "inboard": -17.6, "speed_m_s": "near 0"},
+ "com_end": {"x": 167.0, "inboard": 85.7, "direction": "45 deg forward-inboard", "speed_m_s": "about 0.45 if markers are 25 ms apart (40 intervals in 1.0 s; marker count not exact)"},
+ "zmp_range": {"x": [-26, 71], "outboard": [21, 39]},
+ "com_markers_px": [[275,254],[311,290],[345,324],[376,353],[404,384],[432,410],[456,433],[477,455],[497,473],[514,492],[531,511],[544,526],[560,541],[570,558],[581,574],[592,591],[600,608],[609,624],[618,643],[624,662],[633,681],[640,702],[646,723],[653,746],[660,768],[666,789],[673,811],[679,833],[684,855],[690,875],[694,895],[699,912],[703,927],[708,940],[709,949],[713,957],[716,969]],
+ "rect_center_px": [641, 932.5]
+}

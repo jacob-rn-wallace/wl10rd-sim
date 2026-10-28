@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+
+# run outputs (examples/ holds the committed copy)
+out/
+work/
+runs/
+examples/run.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
