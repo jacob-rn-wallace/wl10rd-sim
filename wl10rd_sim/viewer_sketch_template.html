@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WL-10RD sketch replay</title>
+<style>
+:root { --paper: #f6f4ee; --ink: #1c1b19; --muted: #6d6a63; --rule: #c9c5bb; }
+html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); font: 14px/1.4 "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif; overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#cap { position: fixed; left: 16px; top: 12px; max-width: calc(100% - 32px); pointer-events: none; }
+#cap b { font-weight: 700; }
+#cap .sub { color: var(--muted); font-size: 13px; }
+.bar { position: fixed; left: 16px; right: 16px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.bar input[type=range] { flex: 1 1 200px; min-width: 120px; accent-color: var(--ink); }
+button, select { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); border-radius: 0; padding: 2px 10px; cursor: pointer; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+#clock { font-variant-numeric: tabular-nums; min-width: 6.5em; }
+#style { position: fixed; right: 16px; top: 12px; width: 230px; background: var(--paper); border: 1px solid var(--ink); padding: 0 10px; font-size: 13px; }
+#style summary { cursor: pointer; padding: 4px 0; font-style: italic; }
+#style label { display: grid; grid-template-columns: 1fr 90px; gap: 6px; align-items: center; margin: 4px 0; }
+#style label.ck { display: flex; gap: 6px; }
+#style input[type=range] { width: 90px; accent-color: var(--ink); }
+#style hr { border: 0; border-top: 1px solid var(--rule); margin: 6px 0; }
+#style .note { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
+@media (max-width: 600px) { #style { left: 16px; right: 16px; width: auto; top: auto; bottom: 80px; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="cap" aria-live="off"><div><b>Fig.</b> <span id="capMain">WL-10RD</span></div><div class="sub" id="capSub"></div></div>
+
+<details id="style">
+  <summary>Drawing style</summary>
+  <label>hatch spacing <input type="range" data-u="uSpacing" min="2.5" max="9" step="0.1" value="4.2"></label>
+  <label>hatch weight <input type="range" data-u="uLineW" min="0.5" max="2.5" step="0.05" value="1.25"></label>
+  <label>outline weight <input type="range" data-u="uEdgeW" min="0.5" max="4" step="0.1" value="1.8"></label>
+  <label>wobble <input type="range" data-u="uWobble" min="0" max="4" step="0.1" value="1.4"></label>
+  <label>darkness <input type="range" data-u="uDark" min="0" max="1.6" step="0.05" value="1"></label>
+  <label>rim light <input type="range" data-u="uFresnel" min="0" max="1" step="0.05" value="0.55"></label>
+  <label>shadow <input type="range" id="shadowAmt" min="0" max="1" step="0.05" value="0.42"></label>
+  <label>part tone <input type="range" id="partTone" min="0" max="1" step="0.05" value="0.25"></label>
+  <label class="ck"><input type="checkbox" id="boil"> line boil while playing</label>
+  <hr>
+  <label class="ck"><input type="checkbox" data-show="com" checked> CoM</label>
+  <label class="ck"><input type="checkbox" data-show="zmp" checked> ZMP</label>
+  <label class="ck"><input type="checkbox" data-show="trails" checked> CoM and ZMP paths</label>
+  <label class="ck"><input type="checkbox" data-show="sup" checked> support polygon</label>
+  <label class="ck"><input type="checkbox" data-show="contacts" checked> sole switches</label>
+  <label class="ck"><input type="checkbox" data-show="prints" checked> footprints</label>
+  <label class="ck"><input type="checkbox" data-show="grid" checked> floor grid (10 cm)</label>
+  <p class="note">Symbols follow the paper: quartered circle = CoM (Fig. 7); ▼ switch on, ▽ off (Fig. 7); □ CoM path, ○ ZMP path (Fig. 12). The ruled area is the support polygon from the loaded switches.</p>
+</details>
+
+<div class="bar">
+  <button id="play" type="button">Play</button>
+  <input id="scrub" type="range" min="0" max="10000" value="0" aria-label="time">
+  <span id="clock">0.000 s</span>
+  <select id="speed" aria-label="playback speed"><option>0.1</option><option>0.25</option><option selected>0.5</option><option>1</option></select>
+  <select id="cam" aria-label="camera"><option value="follow">3/4 follow</option><option value="side">side</option><option value="front">front</option><option value="top">top</option></select>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegmentsGeometry.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineGeometry.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineMaterial.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegments2.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/Line2.js"></script>
+<script id="run-data" type="application/json">__RUN_DATA__</script>
+<script>
+(function () {
+'use strict';
+// Rendering: three passes per frame, then annotations.
+//  1. tone pass: Lambert + shadow map -> grey level (r); the support polygon multiplies g to 0 (a mask).
+//  2. id pass:   view-space normal (rgb) + geom id (a), with a depth texture.
+//  3. composite: hatching from tone, outlines from id and normal creases, rim light, paper, floor grid;
+//                writes the depth buffer so step 4 is occluded by the robot (floor pixels write far depth).
+//  4. annotations (CoM, ZMP, paths, switches, footprints) drawn in ink with the normal camera.
+const $ = id => document.getElementById(id);
+const PAPER = new THREE.Color(0xf6f4ee), INK = new THREE.Color(0x1c1b19);
+const SW = ['L_toe_o', 'L_toe_i', 'L_heel_o', 'L_heel_i', 'R_toe_o', 'R_toe_i', 'R_heel_o', 'R_heel_i'];
+const PHNAME = { SS: 'single support', A: 'change-over, phase A', B: 'change-over, phase B', C: 'change-over, phase C', D: 'change-over, phase D', stand: 'standing', shift: 'weight shift', land: 'landing', settle: 'settling' };
+const MAXID = 64;
+let RUN, S, F, T0, T1, cur = 0, playing = false, last = null, view = 'follow';
+const show = { com: true, zmp: true, trails: true, sup: true, contacts: true, prints: true, grid: true };
+
+// ---------- renderer and targets
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+renderer.setPixelRatio(DPR); renderer.autoClear = false;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
+stage.appendChild(renderer.domElement);
+const mkRT = depth => {
+  const rt = new THREE.WebGLRenderTarget(4, 4, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat, type: THREE.UnsignedByteType });
+  if (depth) { rt.depthTexture = new THREE.DepthTexture(4, 4); rt.depthTexture.type = THREE.UnsignedIntType; }
+  return rt;
+};
+const rtTone = mkRT(false), rtGeo = mkRT(true);
+const scene = new THREE.Scene(), over = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 60); camera.up.set(0, 0, 1);
+const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const sun = new THREE.DirectionalLight(0xffffff, 0.68); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.008;
+Object.assign(sun.shadow.camera, { left: -1.4, right: 1.4, top: 1.4, bottom: -1.4, near: 0.5, far: 8 });
+scene.add(sun, sun.target);
+const SUN_DIR = new THREE.Vector3(), _r = new THREE.Vector3(), _b = new THREE.Vector3();
+
+// id pass material: view normal + id
+const geoMat = id => new THREE.ShaderMaterial({
+  uniforms: { uId: { value: id / 255 } },
+  vertexShader: 'varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: 'uniform float uId; varying vec3 vN; void main(){ gl_FragColor = vec4(normalize(vN)*0.5+0.5, uId); }'
+});
+
+// composite
+const comp = new THREE.ShaderMaterial({
+  extensions: { derivatives: true, fragDepth: true },
+  depthTest: true, depthWrite: true, depthFunc: THREE.AlwaysDepth,
+  uniforms: {
+    tTone: { value: rtTone.texture }, tGeo: { value: rtGeo.texture }, tDepth: { value: rtGeo.depthTexture },
+    uRes: { value: new THREE.Vector2(1, 1) }, uDpr: { value: DPR }, uInvVP: { value: new THREE.Matrix4() },
+    uAnchor: { value: Array.from({ length: MAXID }, () => new THREE.Vector2()) },
+    uSpacing: { value: 4.2 }, uLineW: { value: 1.25 }, uEdgeW: { value: 1.8 }, uWobble: { value: 1.4 }, uDark: { value: 1 }, uFresnel: { value: 0.55 },
+    uSeed: { value: 0 }, uFocus: { value: new THREE.Vector2() }, uFade: { value: new THREE.Vector2(1.6, 4) }, uGrid: { value: 1 },
+    uPaper: { value: new THREE.Vector3(PAPER.r, PAPER.g, PAPER.b) }, uInk: { value: new THREE.Vector3(INK.r, INK.g, INK.b) }
+  },
+  vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `
+uniform sampler2D tTone, tGeo, tDepth;
+uniform vec2 uRes, uFocus, uFade; uniform float uDpr, uSpacing, uLineW, uEdgeW, uWobble, uDark, uFresnel, uSeed, uGrid;
+uniform mat4 uInvVP; uniform vec2 uAnchor[${MAXID}]; uniform vec3 uPaper, uInk;
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+int idAt(vec2 uv){ return int(texture2D(tGeo, uv).a * 255.0 + 0.5); }
+// one family of parallel strokes; coverage c in 0..1 sets weight and how broken the strokes are
+float strokes(vec2 p, float ang, float sp, float c, float seed, float phase){
+  if (c <= 0.0) return 0.0;
+  vec2 d = vec2(cos(ang), sin(ang)), n = vec2(-d.y, d.x);
+  float s = dot(p, n) / sp + phase, row = floor(s), a = dot(p, d);
+  float jit = (hash(vec2(row, seed)) - 0.5) * 0.22;
+  float dist = abs(fract(s + jit) - 0.5) * sp;
+  float aa = max(0.35, length(fwidth(p)) * 0.6);
+  float w = mix(0.3, uLineW, c);
+  float ln = 1.0 - smoothstep(w * 0.5 - aa, w * 0.5 + aa, dist);
+  float br = vnoise(vec2(a / (6.0 + 10.0 * c), row * 3.17 + seed + uSeed));
+  float cut = (1.0 - c) * 0.85;
+  return ln * smoothstep(cut - 0.12, cut + 0.12, br);
+}
+float hatch(vec2 p, float tone, float sp){
+  float t = 1.0 - (1.0 - tone) * uDark, ink = 0.0;
+  ink = max(ink, strokes(p, 0.42, sp, clamp((0.86 - t) / 0.28, 0.0, 1.0), 1.0, 0.0));
+  ink = max(ink, strokes(p, -0.95, sp, clamp((0.56 - t) / 0.24, 0.0, 1.0), 2.0, 0.0));
+  ink = max(ink, strokes(p, 0.42, sp, clamp((0.34 - t) / 0.2, 0.0, 1.0), 3.0, 0.5));
+  ink = max(ink, strokes(p, 1.35, sp, clamp((0.16 - t) / 0.16, 0.0, 1.0), 4.0, 0.0));
+  return ink;
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy / uRes, px = gl_FragCoord.xy / uDpr, onePx = uDpr / uRes;
+  vec2 wob = (vec2(vnoise(px * 0.045 + uSeed), vnoise(px * 0.045 + 31.7 + uSeed)) - 0.5) * uWobble;
+  vec4 g = texture2D(tGeo, uv);
+  int id = int(g.a * 255.0 + 0.5);
+  float depth = texture2D(tDepth, uv).r;
+  vec3 tn = texture2D(tTone, uv).rgb;
+  float ink = 0.0;
+  vec3 wp = vec3(0.0);
+  if (id == 1) { vec4 h = uInvVP * vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0); wp = h.xyz / h.w; }
+
+  // ---- outlines: geom-id changes (silhouettes) and normal creases, sampled on a wobbled grid
+  vec2 uvE = uv + wob * onePx;
+  vec4 gc = texture2D(tGeo, uvE); int ic = int(gc.a * 255.0 + 0.5); vec3 nc = gc.rgb * 2.0 - 1.0;
+  float r = uEdgeW * 0.5 * (0.7 + 0.6 * vnoise(px * 0.02 + 7.0 + uSeed));
+  float e = 0.0;
+  for (int k = 0; k < 8; k++) {
+    float an = float(k) * 0.7853982;
+    for (int j = 1; j <= 2; j++) {
+      vec2 o = vec2(cos(an), sin(an)) * r * float(j) * 0.5 * onePx;
+      vec4 gs = texture2D(tGeo, uvE + o); int is = int(gs.a * 255.0 + 0.5);
+      float hit = 0.0;
+      if (is != ic) hit = (min(is, ic) == 0 && max(is, ic) == 1) ? 0.0 : 1.0;   // no line where the floor meets the void
+      else if (ic > 1) hit = smoothstep(0.82, 0.7, dot(nc, gs.rgb * 2.0 - 1.0));
+      e += hit * (j == 1 ? 0.30 : 0.22);
+    }
+  }
+  ink = max(ink, clamp(e, 0.0, 1.0));
+
+  if (id > 1) {
+    // ---- parts: screen-space hatching anchored to each part so it travels with it
+    vec2 anc = vec2(0.0);
+    for (int k = 0; k < ${MAXID}; k++) if (k == id) anc = uAnchor[k];
+    float tone = tn.r;
+    float rim = 1.0 - abs(g.b * 2.0 - 1.0);
+    tone = mix(tone, 1.0, smoothstep(0.55, 0.98, rim) * uFresnel);
+    ink = max(ink, hatch(px - anc + wob * 1.3, tone, uSpacing));
+  } else if (id == 1) {
+    // ---- floor: hatch the cast shadow and rule the support polygon in floor coordinates
+    float fade = 1.0 - smoothstep(uFade.x, uFade.y, distance(wp.xy, uFocus));
+    vec2 fp = px - uAnchor[1] + wob;
+    float sh = hatch(fp, tn.r, uSpacing);
+    float poly = step(0.25, tn.r - tn.g);
+    float pl = poly * strokes(fp, -0.785398, uSpacing * 0.9, 0.6, 9.0, 0.0);
+    float grid = 0.0;
+    if (uGrid > 0.5) {
+      vec2 q = wp.xy / 0.1, fq = abs(fract(q + 0.5) - 0.5), w = fwidth(q);
+      vec2 l = (1.0 - smoothstep(w * 0.5, w * 1.5, fq)) * (1.0 - smoothstep(0.12, 0.3, w));   // drop lines closer than ~4 px
+      vec2 big = step(abs(fract(wp.xy / 0.5 + 0.5) - 0.5) * 5.0, vec2(0.01));   // every 0.5 m
+      float dash = smoothstep(0.3, 0.6, vnoise(wp.xy * 60.0 + uSeed));
+      grid = max(l.x * mix(0.13, 0.38, big.x), l.y * mix(0.13, 0.38, big.y)) * mix(0.5, 1.0, dash);
+    }
+    ink = max(ink, max(max(sh, pl), grid) * fade);
+  }
+
+  // ---- paper
+  float grain = (vnoise(px * 0.9) - 0.5) * 0.035 + (vnoise(px * 0.08 + 3.0) - 0.5) * 0.03;
+  vec3 paper = uPaper + grain;
+  float speck = step(0.9985, hash(floor(px * 0.7) + 0.13));
+  ink = max(ink, speck * 0.35);
+  gl_FragColor = vec4(mix(paper, uInk, clamp(ink, 0.0, 1.0)), 1.0);
+  gl_FragDepthEXT = (id > 1) ? depth : 1.0;
+}`
+});
+const post = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+{ const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), comp); q.frustumCulled = false; post.add(q); }
+
+// ---------- annotation helpers (ink)
+const lineMats = [];
+const lineMat = (w, dashed) => { const m = new THREE.LineMaterial({ color: INK, linewidth: w, dashSize: 0.025, gapSize: 0.018, depthWrite: false });
+  if (dashed) { m.dashed = true; m.defines.USE_DASH = ''; }   // r128 LineMaterial needs the define set by hand
+  lineMats.push(m); return m; };
+const fatLine = (pts, w, dashed) => { const g = new THREE.LineGeometry(); g.setPositions(pts.flat()); const l = new THREE.Line2(g, lineMat(w, dashed)); l.computeLineDistances(); l.frustumCulled = false; return l; };
+const fatSegs = (pts, w, dashed) => { const g = new THREE.LineSegmentsGeometry(); g.setPositions(pts.flat()); const l = new THREE.LineSegments2(g, lineMat(w, dashed)); l.computeLineDistances(); l.frustumCulled = false; return l; };
+function symTex(draw) {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  x.lineWidth = 7; x.strokeStyle = x.fillStyle = '#' + INK.getHexString(); draw(x);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+const PAPERHEX = '#' + PAPER.getHexString();
+const TEX = {
+  com: symTex(x => { x.fillStyle = PAPERHEX; x.beginPath(); x.arc(64, 64, 56, 0, 7); x.fill(); x.fillStyle = '#' + INK.getHexString();
+    x.beginPath(); x.moveTo(64, 64); x.arc(64, 64, 56, -Math.PI / 2, 0); x.fill(); x.beginPath(); x.moveTo(64, 64); x.arc(64, 64, 56, Math.PI / 2, Math.PI); x.fill();
+    x.beginPath(); x.arc(64, 64, 56, 0, 7); x.stroke(); }),
+  on: symTex(x => { x.beginPath(); x.moveTo(14, 20); x.lineTo(114, 20); x.lineTo(64, 108); x.closePath(); x.fill(); }),
+  off: symTex(x => { x.fillStyle = PAPERHEX; x.beginPath(); x.moveTo(14, 20); x.lineTo(114, 20); x.lineTo(64, 108); x.closePath(); x.fill(); x.lineWidth = 9; x.stroke(); })
+};
+const sprite = (tex, px) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, sizeAttenuation: false, depthTest: false, depthWrite: false, transparent: true })); s.userData.px = px; s.renderOrder = 10; return s; };
+const ringGeo = new THREE.RingGeometry(0.0085, 0.012, 20);
+const squareGeo = (() => { const s = new THREE.Shape(); s.moveTo(-0.011, -0.011); s.lineTo(0.011, -0.011); s.lineTo(0.011, 0.011); s.lineTo(-0.011, 0.011); s.lineTo(-0.011, -0.011);
+  const h = new THREE.Path(); h.moveTo(-0.0075, -0.0075); h.lineTo(-0.0075, 0.0075); h.lineTo(0.0075, 0.0075); h.lineTo(0.0075, -0.0075); h.lineTo(-0.0075, -0.0075); s.holes.push(h); return new THREE.ShapeGeometry(s); })();
+const inkFlat = new THREE.MeshBasicMaterial({ color: INK, depthWrite: false, side: THREE.DoubleSide });
+const paperFlat = new THREE.MeshBasicMaterial({ color: PAPER, depthWrite: false, side: THREE.DoubleSide });
+
+// ---------- scene from run.json
+let meshes = [], bodies = [], partMeshes = [], ground, supFill, A = {};
+const qrot = (q, v) => { const [w, x, y, z] = q, [a, b, c] = v, ix = w * a + y * c - z * b, iy = w * b + z * a - x * c, iz = w * c + x * b - y * a, iw = -x * a - y * b - z * c;
+  return [ix * w + iw * -x + iy * -z - iz * -y, iy * w + iw * -y + iz * -x - ix * -z, iz * w + iw * -z + ix * -y - iy * -x]; };
+const bodyPose = (fr, b) => { const o = (b - 1) * 7; return [[fr[o], fr[o + 1], fr[o + 2]], [fr[o + 3], fr[o + 4], fr[o + 5], fr[o + 6]]]; };
+const geomWorld = (fr, g) => { const [p, q] = bodyPose(fr, g.body), v = qrot(q, g.pos); return [p[0] + v[0], p[1] + v[1], p[2] + v[2]]; };
+function hull(pts) {
+  if (pts.length < 3) return pts.slice();
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of p.reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+const partColor = (rgba, k) => { const lum = 0.3 * rgba[0] + 0.59 * rgba[1] + 0.11 * rgba[2]; return new THREE.Color().setScalar(1 - k * (1 - lum) * 0.8); };
+function addSwap(mesh, toneMat, gMat) { mesh.userData.tone = toneMat; mesh.userData.geo = gMat; mesh.userData.on = true; meshes.push(mesh); return mesh; }
+function buildScene() {
+  for (const o of [...scene.children]) if (!o.isLight && o !== sun.target) scene.remove(o);
+  for (const o of [...over.children]) over.remove(o);
+  meshes = []; bodies = []; partMeshes = []; lineMats.length = 0;
+  ground = addSwap(new THREE.Mesh(new THREE.PlaneGeometry(200, 200), null), new THREE.ShadowMaterial({ opacity: +$('shadowAmt').value }), geoMat(1));
+  ground.receiveShadow = true; scene.add(ground);
+  for (let b = 0; b < RUN.nbody; b++) { const g = new THREE.Group(); scene.add(g); bodies.push(g); }
+  let id = 2;
+  for (const g of RUN.geoms) {
+    if (g.body === 0 || id >= MAXID) continue;
+    let geo;
+    if (g.type === 'box') geo = new THREE.BoxGeometry(2 * g.size[0], 2 * g.size[1], 2 * g.size[2]);
+    else if (g.type === 'cylinder') { geo = new THREE.CylinderGeometry(g.size[0], g.size[0], 2 * g.size[1], 40); geo.rotateX(Math.PI / 2); }
+    else geo = new THREE.SphereGeometry(g.size[0], 16, 10);
+    const m = addSwap(new THREE.Mesh(geo, null), new THREE.MeshLambertMaterial({ color: partColor(g.rgba, +$('partTone').value) }), geoMat(id));
+    m.userData.id = id++; m.userData.rgba = g.rgba; m.castShadow = m.receiveShadow = true;
+    m.position.set(...g.pos); m.quaternion.set(g.quat[1], g.quat[2], g.quat[3], g.quat[0]); bodies[g.body - 1].add(m); partMeshes.push(m);
+  }
+  // support polygon: multiplies the tone pass green channel to 0 (read as a mask by the composite)
+  supFill = addSwap(new THREE.Mesh(new THREE.BufferGeometry(), null),
+    new THREE.MeshBasicMaterial({ color: 0xff00ff, blending: THREE.MultiplyBlending, premultipliedAlpha: true, transparent: true, depthWrite: false, side: THREE.DoubleSide }), null);
+  supFill.frustumCulled = false; scene.add(supFill);
+
+  // annotations
+  const n = S.t.length, every = Math.max(1, Math.round(0.02 / (S.t[1] - S.t[0])));
+  const comG = [], zmpG = []; let lz = [0, 0];
+  for (let i = 0; i < n; i += every) { comG.push([S.com[i][0], S.com[i][1], 0.001]); if (S.zmp[i]) lz = S.zmp[i]; zmpG.push([lz[0], lz[1], 0.001]); }
+  A.every = every;
+  A.comPath = fatLine(comG, 1.6); A.zmpPath = fatLine(zmpG, 1.0);
+  // path markers as in Fig. 12, one each time the point has moved 3 cm; at[k] = markers shown up to path index k
+  const mk = (geo, mat, pts) => { const sel = [0]; for (let j = 1; j < pts.length; j++) { const q = pts[sel[sel.length - 1]]; if (Math.hypot(pts[j][0] - q[0], pts[j][1] - q[1]) >= 0.03) sel.push(j); }
+    const im = new THREE.InstancedMesh(geo, mat, sel.length), o = new THREE.Object3D();
+    sel.forEach((j, k) => { o.position.set(pts[j][0], pts[j][1], 0.0015); o.updateMatrix(); im.setMatrixAt(k, o.matrix); });
+    const at = new Int32Array(pts.length); let c = 0; for (let j = 0; j < pts.length; j++) { while (c < sel.length && sel[c] <= j) c++; at[j] = c; }
+    im.userData.at = at; im.frustumCulled = false; return im; };
+  A.comFill = mk(new THREE.PlaneGeometry(0.019, 0.019), paperFlat, comG); A.comMk = mk(squareGeo, inkFlat, comG);
+  A.zmpFill = mk(new THREE.CircleGeometry(0.0095, 20), paperFlat, zmpG); A.zmpMk = mk(ringGeo, inkFlat, zmpG);
+  [A.comFill, A.zmpFill].forEach(m => m.renderOrder = 1); [A.comMk, A.zmpMk].forEach(m => m.renderOrder = 2);
+  A.com = sprite(TEX.com, 22);
+  A.comDrop = fatLine([[0, 0, 0], [0, 0, 1]], 1.0, true);
+  A.comFoot = new THREE.Mesh(squareGeo, inkFlat); A.comFoot.scale.setScalar(1.6);
+  A.zmp = new THREE.Mesh(ringGeo, inkFlat); A.zmp.scale.setScalar(1.8);
+  A.zmpDot = new THREE.Mesh(new THREE.CircleGeometry(0.004, 12), inkFlat);
+  A.supLine = fatLine(Array.from({ length: 9 }, () => [0, 0, 0]), 1.4);
+  A.spikes = RUN.geoms.filter(g => g.spike).map(g => {
+    const side = (bodyPose(F[0].p, g.body)[0][1] > 0) ? 'L' : 'R', s = side === 'L' ? 1 : -1;
+    const sp = sprite(TEX.on, 13); sp.center.set(0.5, 0.05);
+    return { g, sp, k: SW.indexOf(`${side}_${g.pos[0] > 0 ? 'toe' : 'heel'}_${g.pos[1] * s > 0 ? 'o' : 'i'}`) };
+  });
+  A.prints = [];
+  const seen = [[0, 0.13], [0, -0.13]];
+  const prints = [[0, 0.13, 0], [0, -0.13, 0]];
+  for (const [t, , a] of (RUN.supports || [])) if (!seen.some(p => Math.hypot(p[0] - a[0], p[1] - a[1]) < 0.05)) { seen.push(a); prints.push([a[0], a[1], t]); }
+  for (const [x, y, t] of prints) {
+    const c = [[-0.14, -0.07], [0.14, -0.07], [0.14, 0.07], [-0.14, 0.07]].map(([dx, dy]) => [x + dx, y + dy, 0.001]);
+    const l = fatSegs([c[0], c[1], c[1], c[2], c[2], c[3], c[3], c[0]], 0.9, true); l.userData.t = t; A.prints.push(l);
+  }
+  over.add(A.comPath, A.zmpPath, A.comFill, A.comMk, A.zmpFill, A.zmpMk, A.comDrop, A.comFoot, A.zmp, A.zmpDot, A.supLine, A.com, ...A.spikes.map(s => s.sp), ...A.prints);
+  resize();
+}
+function setSupport(h) {
+  const z = 0.0012, pts = [];
+  for (let k = 0; k <= 8; k++) { const p = h.length ? h[k % h.length] : [0, 0]; pts.push(p[0], p[1], z); }
+  if (h.length >= 2) { const close = h.concat([h[0]]); const arr = []; for (let k = 0; k < 9; k++) { const p = close[Math.min(k, close.length - 1)]; arr.push(p[0], p[1], z); } A.supLine.geometry.setPositions(arr); }
+  A.supLine.visible = show.sup && h.length >= 2;
+  if (h.length >= 3) { const v = []; for (let k = 1; k < h.length - 1; k++) v.push(h[0][0], h[0][1], z, h[k][0], h[k][1], z, h[k + 1][0], h[k + 1][1], z);
+    supFill.geometry.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); supFill.userData.on = show.sup; }
+  else supFill.userData.on = false;
+}
+
+// ---------- sizes
+let W = 1, H = 1;
+function resize() {
+  const r = stage.getBoundingClientRect(); if (r.width < 2) return; W = r.width; H = r.height;
+  renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix();
+  const pw = Math.round(W * DPR), ph = Math.round(H * DPR);
+  rtTone.setSize(pw, ph); rtGeo.setSize(pw, ph); comp.uniforms.uRes.value.set(pw, ph);
+  for (const m of lineMats) m.resolution.set(W, H);
+}
+new ResizeObserver(resize).observe(stage);
+// sprites with sizeAttenuation off: clip-space size = scale * cot(fov/2); convert from CSS px
+const spriteScale = px => 2 * px / (H / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+
+// ---------- data
+const idxAt = t => { let lo = 0, hi = S.t.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (S.t[m] <= t) lo = m; else hi = m - 1; } return lo; };
+const frameAt = t => { let lo = 0, hi = F.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (F[m].t <= t) lo = m; else hi = m - 1; } return lo; };
+const clamp = t => Math.max(T0, Math.min(T1, t));
+function setView(v) {
+  view = v; $('cam').value = v; if (!S) return;
+  const p = S.pelvis[idxAt(cur)];
+  if (v === 'side') camera.position.set(p[0], p[1] - 4.2, 0.75);
+  else if (v === 'front') camera.position.set(p[0] + 4.2, p[1], 0.75);
+  else if (v === 'top') camera.position.set(p[0], p[1] - 0.05, 4.5);
+  else camera.position.set(p[0] + 1.9, p[1] - 2.6, 1.4);
+  controls.target.set(p[0], 0, v === 'top' ? 0 : 0.55); controls.update(); update();
+}
+
+// ---------- per-frame state
+function update() {
+  if (!S) return;
+  const i = idxAt(cur), fr = F[frameAt(cur)].p;
+  for (let b = 0; b < bodies.length; b++) { const o = b * 7; bodies[b].position.set(fr[o], fr[o + 1], fr[o + 2]); bodies[b].quaternion.set(fr[o + 4], fr[o + 5], fr[o + 6], fr[o + 3]); }
+  const c = S.com[i], z = S.zmp[i], sw = S.sw[i];
+  A.com.position.set(c[0], c[1], c[2]); A.com.visible = show.com;
+  A.comDrop.geometry.setPositions([c[0], c[1], c[2], c[0], c[1], 0.001]); A.comDrop.computeLineDistances(); A.comDrop.visible = show.com;
+  A.comFoot.position.set(c[0], c[1], 0.0016); A.comFoot.visible = show.com;
+  A.zmp.visible = A.zmpDot.visible = show.zmp && !!z; if (z) { A.zmp.position.set(z[0], z[1], 0.0016); A.zmpDot.position.set(z[0], z[1], 0.0016); }
+  const k = Math.floor(i / A.every);
+  A.comPath.geometry.instanceCount = Math.max(0, k); A.zmpPath.geometry.instanceCount = Math.max(0, k);
+  A.comPath.visible = show.trails && show.com; A.zmpPath.visible = show.trails && show.zmp;
+  for (const m of [A.comFill, A.comMk]) { m.count = m.userData.at[Math.min(k, m.userData.at.length - 1)]; m.visible = show.trails && show.com; }
+  for (const m of [A.zmpFill, A.zmpMk]) { m.count = m.userData.at[Math.min(k, m.userData.at.length - 1)]; m.visible = show.trails && show.zmp; }
+  const on = [];
+  for (const s of A.spikes) {
+    const p = geomWorld(fr, s.g), down = sw[s.k] === '1';
+    s.sp.position.set(p[0], p[1], p[2] - s.g.size[0]); s.sp.material.map = down ? TEX.on : TEX.off; s.sp.visible = show.contacts;
+    if (down) on.push([p[0], p[1]]);
+  }
+  setSupport(hull(on));
+  for (const l of A.prints) l.visible = show.prints && l.userData.t <= S.t[i] + 1e-6;
+  if (view === 'follow' || view === 'top') { const dx = S.pelvis[i][0] - controls.target.x; controls.target.x += dx; camera.position.x += dx; }
+
+  const ph = S.phase[i], aEv = RUN.events.filter(e => e[1].startsWith('A_') && e[0] <= cur + 1e-6), nCO = RUN.events.filter(e => e[1].startsWith('A_')).length;
+  const co = 'ABCD'.includes(ph) && ph.length === 1, lastA = aEv[aEv.length - 1];
+  $('capMain').textContent = `WL-10RD, ${PHNAME[ph] || ph}${co && lastA ? ` (${aEv.length} of ${nCO}, ${lastA[1][2]} → ${lastA[1].split('->')[1]})` : ''}`;
+  $('capSub').textContent = `t = ${cur.toFixed(3)} s · ${RUN.fail ? 'fell: ' + RUN.fail : 'simulated walk, ' + nCO + ' change-overs'}`;
+  const f = (cur - T0) / (T1 - T0); $('scrub').value = Math.round(f * 10000); $('clock').textContent = cur.toFixed(3) + ' s';
+}
+
+// ---------- draw
+const _v = new THREE.Vector3(), _m = new THREE.Matrix4();
+function setPass(p) { for (const m of meshes) { const mat = m.userData[p]; m.visible = m.userData.on && !!mat; if (mat) m.material = mat; } }
+function render() {
+  // illustrator's light: over the viewer's left shoulder, so lit faces face the reader in every view; the shadow camera follows the robot
+  const t = controls.target;
+  _b.set(camera.position.x - t.x, camera.position.y - t.y, 0); if (_b.lengthSq() < 1e-4) _b.set(0, -1, 0); _b.normalize(); _r.set(_b.y, -_b.x, 0);   // _r = viewer's left
+  SUN_DIR.set(0, 0, 1.7).addScaledVector(_b, 0.75).addScaledVector(_r, 0.75).normalize();
+  sun.target.position.set(t.x, t.y, 0); sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 4);
+  scene.updateMatrixWorld(); camera.updateMatrixWorld();
+  // per-part hatch anchors: projected part centre in CSS px (gl_FragCoord orientation, y up)
+  const anc = comp.uniforms.uAnchor.value;
+  for (const m of partMeshes) { m.getWorldPosition(_v).project(camera); anc[m.userData.id].set((_v.x * 0.5 + 0.5) * W, (_v.y * 0.5 + 0.5) * H); }
+  comp.uniforms.uInvVP.value.copy(_m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)).invert();
+  comp.uniforms.uFocus.value.set(t.x, t.y);
+  const cd = camera.position.distanceTo(t); comp.uniforms.uFade.value.set(0.45 * cd, 1.05 * cd);
+  _v.set(t.x, t.y, 0).project(camera); anc[1].set((_v.x * 0.5 + 0.5) * W, (_v.y * 0.5 + 0.5) * H);
+  for (const o of over.children) if (o.isSprite) o.scale.setScalar(spriteScale(o.userData.px));
+
+  setPass('tone'); renderer.shadowMap.needsUpdate = true;
+  renderer.setRenderTarget(rtTone); renderer.setClearColor(0xffffff, 1); renderer.clear(); renderer.render(scene, camera);
+  setPass('geo');
+  renderer.setRenderTarget(rtGeo); renderer.setClearColor(0x8080ff, 0); renderer.clear(); renderer.render(scene, camera);
+  renderer.setRenderTarget(null); renderer.setClearColor(PAPER, 1); renderer.clear(); renderer.render(post, postCam);
+  renderer.render(over, camera);
+}
+
+// ---------- controls
+function syncPlay() { $('play').textContent = playing ? 'Pause' : 'Play'; }
+$('play').onclick = () => { playing = !playing; if (playing && cur >= T1) cur = T0; last = null; syncPlay(); };
+$('scrub').oninput = () => { cur = T0 + $('scrub').value / 10000 * (T1 - T0); playing = false; syncPlay(); update(); };
+$('cam').onchange = e => setView(e.target.value);
+document.querySelectorAll('[data-u]').forEach(el => { const f = () => comp.uniforms[el.dataset.u].value = +el.value; el.oninput = f; f(); });
+document.querySelectorAll('[data-show]').forEach(el => el.onchange = () => { show[el.dataset.show] = el.checked; comp.uniforms.uGrid.value = show.grid ? 1 : 0; update(); });
+$('shadowAmt').oninput = e => { ground.userData.tone.opacity = +e.target.value; };
+$('partTone').oninput = e => { for (const m of partMeshes) m.userData.tone.color.copy(partColor(m.userData.rgba, +e.target.value)); };
+document.addEventListener('keydown', e => {
+  const tg = e.target.tagName; if (e.ctrlKey || e.metaKey || e.altKey || tg === 'SELECT' || (tg === 'INPUT' && e.target.type === 'range' && !e.key.startsWith('Arrow'))) return;
+  if (e.key === ' ' && tg !== 'BUTTON') { e.preventDefault(); $('play').click(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); playing = false; syncPlay(); cur = clamp(cur + (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 0.1 : 0.01)); update(); }
+  else if ('1234'.includes(e.key) && e.key.length === 1) setView(['follow', 'side', 'front', 'top'][+e.key - 1]);
+});
+let boilT = 0;
+function loop(ts) {
+  if (playing && S) {
+    if (last != null) { cur += (ts - last) / 1000 * parseFloat($('speed').value); if (cur >= T1) { cur = T1; playing = false; syncPlay(); } update(); }
+    last = ts;
+    if ($('boil').checked && ts - boilT > 110) { boilT = ts; comp.uniforms.uSeed.value = (comp.uniforms.uSeed.value + 17.31) % 1000; }
+  } else last = null;
+  controls.update(); render(); requestAnimationFrame(loop);
+}
+function load(run) {
+  RUN = run; S = run.series; F = run.frames; T0 = S.t[0]; T1 = S.t[S.t.length - 1];
+  buildScene();
+  const a = RUN.events.find(e => e[1].startsWith('A_')); cur = a ? a[0] + 0.12 : T0;
+  const hp = new URLSearchParams(location.hash.slice(1));   // e.g. #t=3.4&view=side
+  if (hp.has('t')) cur = clamp(+hp.get('t')); if (hp.has('view')) view = hp.get('view');
+  setView(view);
+  if (hp.has('zoom')) { camera.position.sub(controls.target).multiplyScalar(1 / +hp.get('zoom')).add(controls.target); if (hp.has('tz')) controls.target.z = +hp.get('tz'); controls.update(); }
+}
+try { load(JSON.parse($('run-data').textContent)); }
+catch (err) { $('capMain').textContent = 'No run embedded'; $('capSub').textContent = 'Build this page with python -m wl10rd_sim.run_walk.'; console.error(err); }
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

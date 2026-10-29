@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WL-10RD Replay</title>
+<style>
+/* Minimal research viewer: native controls, system font and colours. Styling comes later. */
+:root { color-scheme: light dark;
+  --line: #8c959f; --s1: #0969da; --s2: #bc4c00; --com: #0969da; --zmp: #bc4c00; --sup: #1a7f37; --vp-com: #58a6ff; --vp-zmp: #f0883e; --vp-sup: #3fb950;
+  --ph-ss: #6e7781; --ph-a: #d4a72c; --ph-b: #bc4c00; --ph-c: #54aeff; --ph-d: #0550ae; --ph-st: #afb8c1; }
+@media (prefers-color-scheme: dark) { :root { --line: #6e7681; --s1: #58a6ff; --s2: #f0883e; --com: #58a6ff; --zmp: #f0883e; --sup: #3fb950;
+  --ph-ss: #6e7781; --ph-a: #d29922; --ph-b: #bd561d; --ph-c: #79c0ff; --ph-d: #1f6feb; --ph-st: #8b949e; } }
+* { box-sizing: border-box }
+body { margin: 0 auto; max-width: 1500px; padding: 10px 16px 32px; font: 14px/1.4 system-ui, sans-serif; background: Canvas; color: CanvasText }
+h1 { font-size: 17px; margin: 0 }
+h2 { font-size: 13px; margin: 0 0 4px }
+header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-bottom: 8px }
+.mono, table, .hud { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums }
+.muted { opacity: .75; font-size: 12px }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; align-items: start }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+.stage { position: relative; aspect-ratio: 16 / 9; border: 1px solid var(--line); background: #161b22 }
+@media (max-width: 600px) { .stage { aspect-ratio: 4 / 3 } }
+.stage canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important }
+.hud { position: absolute; left: 8px; top: 6px; right: 8px; display: flex; justify-content: space-between; gap: 8px; color: #e6edf3; font-size: 12px; pointer-events: none; text-shadow: 0 1px 2px #000 }
+.hud b { font-size: 16px }
+.key3d { position: absolute; left: 8px; bottom: 6px; color: #e6edf3; font-size: 11px; pointer-events: none; text-shadow: 0 1px 2px #000; display: flex; gap: 10px }
+.row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px }
+.row input[type=range] { flex: 1 1 240px; min-width: 0 }
+.strip { position: relative; height: 16px; margin-top: 6px; border: 1px solid var(--line); overflow: hidden; cursor: pointer; font: 10px/14px ui-monospace, monospace; color: #fff }
+.strip .seg { position: absolute; top: 0; bottom: 0; text-align: center; overflow: hidden }
+.strip .cur { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: CanvasText; box-shadow: 0 0 0 1px Canvas }
+.legend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; margin-top: 4px }
+.legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border: 1px solid CanvasText; vertical-align: -1px }
+.side { display: grid; gap: 10px; min-width: 0 }
+.panel { border: 1px solid var(--line); padding: 8px 10px; min-width: 0 }
+.phase { display: flex; align-items: baseline; gap: 10px }
+.phase b { font-size: 22px; min-width: 2.5ch }
+canvas.sup { display: block; width: 100%; height: 210px }
+table { border-collapse: collapse; width: 100%; font-size: 12px }
+th, td { padding: 2px 6px; text-align: right; white-space: nowrap; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent) }
+th:first-child, td:first-child { text-align: left; font-weight: normal }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 12px }
+.tabs [aria-selected="true"] { font-weight: 700; outline: 2px solid var(--s1) }
+canvas.chart { display: block; width: 100%; height: 280px; border: 1px solid var(--line); cursor: crosshair; margin-top: 6px }
+details { margin-top: 10px } summary { cursor: pointer; font-weight: 600 }
+.tblwrap { overflow-x: auto }
+kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); padding: 0 3px }
+</style>
+</head>
+<body>
+<header>
+  <h1>WL-10RD replay</h1>
+  <span id="summary" class="muted"></span>
+  <label style="margin-left:auto" class="muted">Open run.json <input type="file" id="fileIn" accept=".json,application/json"></label>
+</header>
+
+<div class="grid">
+  <section aria-label="3D replay and playback" style="min-width:0">
+    <div class="stage" id="stage">
+      <div class="hud"><span id="hudL"></span><span id="hudR" style="text-align:right"></span></div>
+      <div class="key3d" aria-hidden="true"><span style="color:var(--vp-com)">● CoM</span><span style="color:var(--vp-zmp)">◆ ZMP</span><span style="color:var(--vp-sup)">▱ support polygon</span><span>axes x red, y green, z blue</span></div>
+    </div>
+    <div class="row">
+      <button data-cmd="start" title="Home">⏮</button>
+      <button data-cmd="event" data-arg="-1" title="Previous event [">◀◀</button>
+      <button data-cmd="step" data-arg="-1" title="Step back ←">◀</button>
+      <button id="play" data-cmd="play" title="Space" style="min-width:64px">Play</button>
+      <button data-cmd="step" data-arg="1" title="Step forward →">▶</button>
+      <button data-cmd="event" data-arg="1" title="Next event ]">▶▶</button>
+      <button data-cmd="end" title="End">⏭</button>
+      <label>Speed <select id="speed"><option>0.1</option><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option></select>×</label>
+      <label>Loop <select id="loop"><option value="off">off</option><option value="co">this change-over</option><option value="ss">this single-support step</option></select></label>
+      <input type="range" id="scrub" min="0" max="10000" value="0" aria-label="Time">
+      <span class="mono" id="clock">0.000 s</span>
+    </div>
+    <div class="strip" id="strip" title="Phase timeline (click or drag to seek)"><div class="cur" id="stripCur"></div></div>
+    <div class="row">
+      <label>Camera <select id="cam"><option value="follow">follow</option><option value="side">side</option><option value="front">front</option><option value="top">top</option></select></label>
+      <label><input type="checkbox" data-show="com" checked> CoM</label>
+      <label><input type="checkbox" data-show="zmp" checked> ZMP</label>
+      <label><input type="checkbox" data-show="sup" checked> support polygon</label>
+      <label><input type="checkbox" data-show="trails" checked> trails</label>
+      <label><input type="checkbox" data-show="prints"> footprints</label>
+      <span class="muted">Drag to orbit, scroll to zoom. <kbd>Space</kbd> <kbd>←</kbd><kbd>→</kbd> <kbd>[</kbd><kbd>]</kbd> <kbd>1</kbd>–<kbd>4</kbd></span>
+    </div>
+  </section>
+
+  <div class="side">
+    <section class="panel" aria-labelledby="h-ph">
+      <h2 id="h-ph">Phase</h2>
+      <div class="phase"><b id="phBig">—</b><span id="phText"></span></div>
+      <div id="phWhy" class="muted" style="margin-top:4px"></div>
+    </section>
+    <section class="panel" aria-labelledby="h-sup">
+      <h2 id="h-sup">Support (top view, x forward)</h2>
+      <canvas class="sup" id="cSup" role="img"></canvas>
+      <div class="mono" id="supText" style="font-size:12px;margin-top:4px"></div>
+      <div class="muted">Polygon = hull of the spikes whose micro switch is on (20 N threshold), as the robot itself senses contact. ◆ ZMP from spike forces, + CoM ground projection.</div>
+    </section>
+    <section class="panel" aria-labelledby="h-ro">
+      <h2 id="h-ro">State</h2>
+      <table><tbody id="readout"></tbody></table>
+      <details><summary class="muted">Joints (deg)</summary>
+        <table><thead><tr><th>joint</th><th>L</th><th>R</th></tr></thead><tbody id="joints"></tbody></table>
+      </details>
+    </section>
+  </div>
+</div>
+
+<div class="tabs" role="tablist" aria-label="Chart">
+  <button role="tab" data-tab="time" aria-selected="true">Time series</button>
+  <button role="tab" data-tab="plan" aria-selected="false">Plan view (cf. Fig. 12)</button>
+  <button role="tab" data-tab="phase" aria-selected="false">Phase plane (cf. Fig. 8)</button>
+  <label id="sigWrap">Signal <select id="sig"></select></label>
+  <span class="legend" id="key" style="margin:0"></span>
+</div>
+<canvas class="chart" id="chart" role="img"></canvas>
+<div class="legend" id="legend"></div>
+
+<details>
+  <summary>Change-over table</summary>
+  <div class="tblwrap"><table id="tbl"></table></div>
+  <p class="muted">Values tuned in simulation, starting from the paper's Table 3 (in brackets). Set torques were kept within the paper's ±100 N·m ankle range, but several damping values (up to about 550 N·m·s/rad) are above what the paper reports for its actuators, so treat the table as one solution for the estimated model, not a reconstruction of the robot's. VIS N·m·s/rad, ELA N·m/rad, NP deg, TRQ N·m. POS = position control. H/F = hind/front ankle, P/R = pitch/roll. Roll values are mirrored per side (+ = hip outboard of the foot).</p>
+</details>
+<details>
+  <summary>What is from the paper and what is not</summary>
+  <p><b>From the papers:</b> link lengths, hip spacing, foot size and total mass (83 kg); 40 cm steps with 1.0 s single support; straighter legs than before (Fig. 18, and Figs. 7 and 10 of the WL-10R paper show nearly straight support legs; in this model the knees still bend about 45° while walking, down from about 63° in the first version, because the legs must reach a 40 cm stance); the CoM path over the sole in single support (Fig. 12, digitized); the three-state, sixth-order joint pattern with start and end acceleration, checked by ZMP; the tracking mode of Eq. 45 (sign corrected); four change-over phases switched by four micro switches per sole and the front ankle angle; ankle impedance control of Eq. 33 within ±100 N·m.</p>
+  <p><b>Estimated:</b> the mass of every link (55 kg above the hips, 14 kg per leg, chosen so the CoM sits about 0.77 m above the ankle axis, as Figs. 8 and 12 together imply); servo stiffness; spike positions; switch threshold. The papers give none of these.</p>
+  <p><b>Changed to make it walk:</b> hip and knee joints follow the measured pelvis during the change-over so the feet stay on their footprints (the paper says these joints do not move); the hind ankle roll is compliant in A and B; phase D also waits for the front ankle roll and a flat front foot, with a 0.35 s time-out; the stop step sets the swing foot down beside the support foot while the body is still moving, then settles in double support (the paper does not say how its walks stop). The change-over table and the patterns were tuned by search in this simulation.</p>
+  <p><b>Result vs paper:</b> each change-over takes about 0.8 s, not 0.5 s, and phase D always ends on the time-out rather than the ankle-angle trigger. For most of each single-support phase the support foot is loaded on its outer edge, not on all four spikes. The CoM enters single support about 3 cm further inboard than Fig. 12. This 4-change-over walk completes, but a 5th change-over fails, and an extra 0.02 m/s of sideways velocity at the start makes it fall, so the solution is fragile.</p>
+</details>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script id="run-data" type="application/json">__RUN_DATA__</script>
+<script>
+(function () {
+'use strict';
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const PHK = { SS: 'ss', A: 'a', B: 'b', C: 'c', D: 'd' }, phKey = p => PHK[p] || 'st';
+const PHNAME = { SS: 'single support', A: 'change-over A', B: 'change-over B', C: 'change-over C', D: 'change-over D', stand: 'standing', shift: 'weight shift', land: 'landing', settle: 'settling' };
+// what ends each phase (CLAUDE.md, "How the walk runs")
+const PHWHY = { A: 'A: rear foot only. Ends when the front heel or toe touches.', B: 'B: front foot landing. Ends when the front heel and toe are both down.', C: 'C: both feet flat. Ends when the rear heel lifts.', D: 'D: rear foot leaving.', SS: 'Single support: all joints follow the preset pattern.' };
+const SW = ['L_toe_o', 'L_toe_i', 'L_heel_o', 'L_heel_i', 'R_toe_o', 'R_toe_i', 'R_heel_o', 'R_heel_i'];
+const SIGNALS = {
+  margin: ['ZMP margin inside support polygon (m)', [['margin', i => MARGIN[i]]], true],
+  lat: ['lateral y: CoM, ZMP (m)', [['CoM', i => S.com[i][1]], ['ZMP', i => S.zmp[i] && S.zmp[i][1]]]],
+  fwd: ['forward x: CoM, ZMP (m)', [['CoM', i => S.com[i][0]], ['ZMP', i => S.zmp[i] && S.zmp[i][0]]]],
+  taup: ['ankle pitch torque L, R (N·m)', [['L', i => S.tau_ankle[i][0]], ['R', i => S.tau_ankle[i][2]]]],
+  taur: ['ankle roll torque L, R (N·m)', [['L', i => S.tau_ankle[i][1]], ['R', i => S.tau_ankle[i][3]]]],
+  apitch: ['ankle pitch angle L, R (deg)', [['L', i => S.q[i][J.L_ankle_pitch]], ['R', i => S.q[i][J.R_ankle_pitch]]]],
+  aroll: ['ankle roll angle L, R (deg)', [['L', i => S.q[i][J.L_ankle_roll]], ['R', i => S.q[i][J.R_ankle_roll]]]],
+  knee: ['knee angle L, R (deg)', [['L', i => S.q[i][J.L_knee]], ['R', i => S.q[i][J.R_knee]]]],
+  hip: ['hip pitch angle L, R (deg)', [['L', i => S.q[i][J.L_hip_pitch]], ['R', i => S.q[i][J.R_hip_pitch]]]],
+  height: ['height z: pelvis, CoM (m)', [['pelvis', i => S.pelvis[i][2]], ['CoM', i => S.com[i][2]]]]
+};
+let RUN, S, F, T0, T1, J, phStart, prints, coRuns, SPK, FOOT, MARGIN, HULL;
+let cur = 0, playing = false, last = null, view = 'follow', tab = 'time';
+const show = { com: true, zmp: true, sup: true, trails: true, prints: false };
+
+// ---------- geometry: spikes, feet, support polygon
+const qrot = (q, v) => { // q = [w,x,y,z]
+  const [w, x, y, z] = q, [a, b, c] = v, ix = w * a + y * c - z * b, iy = w * b + z * a - x * c, iz = w * c + x * b - y * a, iw = -x * a - y * b - z * c;
+  return [ix * w + iw * -x + iy * -z - iz * -y, iy * w + iw * -y + iz * -x - ix * -z, iz * w + iw * -z + ix * -y - iy * -x];
+};
+function bodyPose(fr, body) { const o = (body - 1) * 7; return [[fr[o], fr[o + 1], fr[o + 2]], [fr[o + 3], fr[o + 4], fr[o + 5], fr[o + 6]]]; }
+function geomWorld(fr, g, local) { const [p, q] = bodyPose(fr, g.body), v = qrot(q, [g.pos[0] + local[0], g.pos[1] + local[1], g.pos[2] + local[2]]); return [p[0] + v[0], p[1] + v[1], p[2] + v[2]]; }
+function hull(pts) {
+  if (pts.length < 3) return pts.slice();
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of p.reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function segDist(p, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L)) : 0; return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); }
+function margin(p, h) { // signed distance: + inside the polygon, − outside; with < 3 spikes the best possible is 0
+  if (!h.length) return null;
+  if (h.length === 2) return -segDist(p, h[0], h[1]);
+  if (h.length === 1) return -Math.hypot(p[0] - h[0][0], p[1] - h[0][1]);
+  let d = Infinity, inside = h.length >= 3;
+  for (let k = 0; k < h.length; k++) { const a = h[k], b = h[(k + 1) % h.length]; d = Math.min(d, segDist(p, a, b)); if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) < 0) inside = false; }
+  return inside ? d : -d;
+}
+function setupGeometry() {
+  // spike geoms (group 2) per foot body; name them from their position in the foot frame
+  const sp = RUN.geoms.filter(g => g.spike), bodiesY = {};
+  const fr0 = F[0].p; for (const g of sp) bodiesY[g.body] = bodyPose(fr0, g.body)[0][1];
+  SPK = sp.map(g => { const side = bodiesY[g.body] > 0 ? 'L' : 'R', s = side === 'L' ? 1 : -1; return { g, side, k: SW.indexOf(`${side}_${g.pos[0] > 0 ? 'toe' : 'heel'}_${g.pos[1] * s > 0 ? 'o' : 'i'}`) }; });
+  FOOT = {}; for (const side of ['L', 'R']) { const b = (SPK.find(s => s.side === side) || {}).g; if (b) FOOT[side] = RUN.geoms.filter(g => g.body === b.body && g.type === 'box').sort((x, y) => y.size[0] * y.size[1] - x.size[0] * x.size[1])[0]; }
+  MARGIN = new Array(S.t.length); HULL = new Array(S.t.length);
+  for (let i = 0; i < S.t.length; i++) {
+    const fr = F[frameAt(S.t[i])].p, sw = S.sw[i], on = SPK.filter(s => sw[s.k] === '1').map(s => geomWorld(fr, s.g, [0, 0, 0]).slice(0, 2));
+    HULL[i] = hull(on); MARGIN[i] = S.zmp[i] && on.length ? margin(S.zmp[i], HULL[i]) : null;
+  }
+}
+
+// ---------- 3D
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setClearColor(0x161b22); stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.05, 60); camera.up.set(0, 0, 1);
+const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.7); sun.position.set(2, -3, 5); scene.add(sun);
+let world, bodies, comMark, comDrop, zmpMark, comTrail, zmpTrail, printGroup, supLine, supFill;
+function buildScene() {
+  if (world) scene.remove(world); world = new THREE.Group(); scene.add(world); bodies = [];
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 10), new THREE.MeshLambertMaterial({ color: 0x22272e })); floor.position.set(8, 0, 0); world.add(floor);
+  const grid = new THREE.GridHelper(40, 400, 0x3d444d, 0x30363d); grid.rotation.x = Math.PI / 2; grid.position.set(8, 0, 0.0005); world.add(grid);
+  const axes = new THREE.AxesHelper(0.3); axes.position.set(-0.45, 0.45, 0.001); world.add(axes);
+  for (let b = 0; b < RUN.nbody; b++) { const g = new THREE.Group(); world.add(g); bodies.push(g); }
+  for (const g of RUN.geoms) {
+    if (g.body === 0) continue;
+    let geo;
+    if (g.type === 'box') geo = new THREE.BoxGeometry(2 * g.size[0], 2 * g.size[1], 2 * g.size[2]);
+    else if (g.type === 'cylinder') { geo = new THREE.CylinderGeometry(g.size[0], g.size[0], 2 * g.size[1], 24); geo.rotateX(Math.PI / 2); }
+    else geo = new THREE.SphereGeometry(g.size[0], 12, 8);
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: new THREE.Color(g.rgba[0], g.rgba[1], g.rgba[2]) }));
+    m.position.set(...g.pos); m.quaternion.set(g.quat[1], g.quat[2], g.quat[3], g.quat[0]); bodies[g.body - 1].add(m);
+  }
+  const com = new THREE.Color(css('--vp-com')), zmp = new THREE.Color(css('--vp-zmp')), sup = new THREE.Color(css('--vp-sup'));
+  comMark = new THREE.Mesh(new THREE.SphereGeometry(0.025, 16, 10), new THREE.MeshBasicMaterial({ color: com }));
+  comDrop = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 1, 6), new THREE.MeshBasicMaterial({ color: com })); comDrop.rotation.x = Math.PI / 2;
+  zmpMark = new THREE.Mesh(new THREE.OctahedronGeometry(0.022), new THREE.MeshBasicMaterial({ color: zmp }));
+  world.add(comMark, comDrop, zmpMark);
+  const trail = (key, col, z) => {
+    const pts = []; for (let i = 0; i < S.t.length; i += 2) { const v = S[key][i]; pts.push(v ? new THREE.Vector3(v[0], v[1], z) : (pts[pts.length - 1] || new THREE.Vector3(0, 0, z)).clone()); }
+    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.6 })); world.add(l); return l;
+  };
+  comTrail = trail('com', com, 0.002); zmpTrail = trail('zmp', zmp, 0.003);
+  printGroup = new THREE.Group(); world.add(printGroup);
+  for (const p of prints) {
+    const pts = [[-0.14, -0.07], [0.14, -0.07], [0.14, 0.07], [-0.14, 0.07]].map(([dx, dy]) => new THREE.Vector3(p[0] + dx, p[1] + dy, 0.004));
+    const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x8b949e })); l.userData.t = p[3]; printGroup.add(l);
+  }
+  const g8 = new THREE.BufferGeometry(); g8.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9 * 3), 3));
+  supLine = new THREE.LineLoop(g8, new THREE.LineBasicMaterial({ color: sup })); world.add(supLine);
+  supFill = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: sup, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })); world.add(supFill);
+}
+function setSupport(h) {
+  const pos = supLine.geometry.attributes.position; for (let k = 0; k < 9; k++) { const p = h[Math.min(k, h.length - 1)] || [0, 0]; pos.setXYZ(k, p[0], p[1], 0.006); }
+  pos.needsUpdate = true; supLine.geometry.setDrawRange(0, h.length);
+  if (h.length >= 3) { const v = []; for (let k = 1; k < h.length - 1; k++) v.push(h[0][0], h[0][1], 0.005, h[k][0], h[k][1], 0.005, h[k + 1][0], h[k + 1][1], 0.005); supFill.geometry.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); supFill.visible = show.sup; }
+  else supFill.visible = false;
+}
+function setView(v) {
+  view = v; $('cam').value = v; if (!S) return;
+  const p = S.pelvis[idxAt(cur)];
+  if (v === 'side') camera.position.set(p[0], p[1] - 4.2, 0.9);
+  else if (v === 'front') camera.position.set(p[0] + 4.2, p[1], 0.9);
+  else if (v === 'top') camera.position.set(p[0], p[1] - 0.05, 4.5);
+  else camera.position.set(p[0] + 1.9, p[1] - 2.6, 1.5);
+  controls.target.set(p[0], 0, v === 'top' ? 0 : 0.55); controls.update(); update();
+}
+function resize() { const r = stage.getBoundingClientRect(); if (r.width < 2) return; renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(stage);
+
+// ---------- data helpers
+const idxAt = t => { let lo = 0, hi = S.t.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (S.t[m] <= t) lo = m; else hi = m - 1; } return lo; };
+const frameAt = t => { let lo = 0, hi = F.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (F[m].t <= t) lo = m; else hi = m - 1; } return lo; };
+const clamp = t => Math.max(T0, Math.min(T1, t));
+const fmtA = v => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(1);
+const mm = v => v == null ? '—' : Math.abs(v) < 0.0005 ? '0 mm' : (v > 0 ? '+' : '−') + Math.abs(v * 1000).toFixed(0) + ' mm';
+function derive() {
+  J = {}; RUN.joint_names.forEach((n, k) => J[n] = k);
+  phStart = []; for (let i = 0; i < S.t.length; i++) phStart[i] = i && S.phase[i] === S.phase[i - 1] ? phStart[i - 1] : i;
+  prints = [];
+  if (RUN.supports && RUN.supports.length) {
+    prints.push([0, 0.13, 'L', 0], [0, -0.13, 'R', 0]);
+    for (const [t, side, a] of RUN.supports) if (!prints.some(p => Math.hypot(p[0] - a[0], p[1] - a[1]) < 0.05)) prints.push([a[0], a[1], side, t]);
+  }
+  coRuns = []; let r = null;
+  for (let i = 1; i < S.t.length; i++) {
+    const ph = S.phase[i];
+    if ('ABCD'.includes(ph) && ph.length === 1) { if (!r) coRuns.push(r = { i0: i, pts: [] }); r.pts.push([i, (S.com[i][0] - S.com[i - 1][0]) / (S.t[i] - S.t[i - 1]), ph]); } else r = null;
+  }
+  setupGeometry();
+}
+function loopRange() {
+  const mode = $('loop').value; if (mode === 'off') return null;
+  const ev = RUN.events, startP = mode === 'co' ? e => e[1].startsWith('A_') : e => e[1].startsWith('SS_');
+  const endP = mode === 'co' ? e => e[1] === 'D_end' : e => e[1].startsWith('A_') || e[1] === 'land';
+  const starts = ev.filter(startP).map(e => e[0]); if (!starts.length) return null;
+  let a = [...starts].reverse().find(t => t <= cur + 1e-6); if (a == null) a = starts[0];
+  let b = (ev.find(e => endP(e) && e[0] > a + 1e-6) || [T1])[0];
+  if (cur > b + 1e-6) { const n = starts.find(t => t > cur); if (n != null) { a = n; b = (ev.find(e => endP(e) && e[0] > a + 1e-6) || [T1])[0]; } }
+  return [a, b];
+}
+function buildStatic() {
+  const nCO = RUN.events.filter(e => e[1].startsWith('A_')).length;
+  $('summary').textContent = `${RUN.fail ? 'fell: ' + RUN.fail : 'walk completed'} · ${nCO} change-overs · ends at ${T1.toFixed(2)} s`;
+  const strip = $('strip'); strip.querySelectorAll('.seg').forEach(e => e.remove());
+  let a = 0;
+  for (let i = 1; i <= S.t.length; i++) if (i === S.t.length || S.phase[i] !== S.phase[a]) {
+    const el = document.createElement('div'), w = (S.t[Math.min(i, S.t.length - 1)] - S.t[a]) / (T1 - T0) * 100, ph = S.phase[a];
+    el.className = 'seg'; el.style.cssText = `left:${(S.t[a] - T0) / (T1 - T0) * 100}%;width:${w}%;background:var(--ph-${phKey(ph)});color:${'AC'.includes(ph) || phKey(ph) === 'st' ? '#000' : '#fff'}`;
+    el.textContent = w > 2.5 ? (ph.length <= 2 ? ph : '') : ''; el.title = PHNAME[ph] || ph; strip.insertBefore(el, $('stripCur')); a = i;
+  }
+  const items = [['ss', 'SS single support'], ['a', 'A rear foot only'], ['b', 'B front foot landing'], ['c', 'C both feet flat'], ['d', 'D rear foot leaving'], ['st', 'stand / shift / land / settle']];
+  $('legend').innerHTML = items.map(([k, l]) => `<span><i style="background:var(--ph-${k})"></i>${l}</span>`).join('');
+  $('joints').innerHTML = ['hip_roll', 'hip_pitch', 'hip_yaw', 'knee', 'ankle_pitch', 'ankle_roll'].map(n => `<tr><td>${n.replace('_', ' ')}</td><td id="jL_${n}"></td><td id="jR_${n}"></td></tr>`).join('');
+  $('sig').innerHTML = Object.entries(SIGNALS).map(([k, s]) => `<option value="${k}">${s[0]}</option>`).join(''); $('sig').value = 'margin';
+  const paper = { HP: { A: [200, 0, 0, -3], B: [90, 0, 0, -28], C: [55, 300, -15, 19], D: 'POS' }, HR: { A: 'POS', B: 'POS', C: [80, 0, 0, 0], D: 'POS' }, FP: { A: 'POS', B: [55, 280, 0, 0], C: [50, 300, 0, 0], D: [400, 800, 1, 28] }, FR: { A: 'POS', B: [80, 0, 0, 0], C: [250, 300, 12, -10], D: [70, 800, 12, 38] } };
+  const names = { HP: 'H.P. hind pitch', HR: 'H.R. hind roll', FP: 'F.P. front pitch', FR: 'F.R. front roll' };
+  let h = '<thead><tr><th>actuator</th><th></th><th>A</th><th>B</th><th>C</th><th>D</th></tr></thead><tbody>';
+  for (const k of ['HP', 'HR', 'FP', 'FR']) ['VIS', 'ELA', 'NP', 'TRQ'].forEach((f, fi) => {
+    h += `<tr><td>${fi ? '' : names[k]}</td><td>${f}</td>`;
+    for (const ph of 'ABCD') {
+      const v = RUN.table && RUN.table[k] ? RUN.table[k][ph] : null, p = paper[k][ph];
+      const sv = v == null ? '—' : v === 'POS' ? (fi ? '' : 'POS') : (+v[fi]).toFixed(fi === 2 ? 1 : 0);
+      const sp = p === 'POS' ? (fi ? '' : 'POS') : String(p[fi]);
+      h += `<td>${sv}${sp !== '' && sp !== sv ? ` (${sp})` : ''}</td>`;
+    }
+    h += '</tr>';
+  });
+  $('tbl').innerHTML = h + '</tbody>';
+}
+
+// ---------- 2D drawing
+function setup(c) {
+  const r = c.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.max(1, Math.round(r.width * d)); c.height = Math.max(1, Math.round(r.height * d));
+  const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return [x, r.width, r.height];
+}
+function ticks(lo, hi, n) {
+  const span = hi - lo, mag = Math.pow(10, Math.floor(Math.log10(span / n)));
+  const st = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
+  const o = []; for (let v = Math.ceil(lo / st) * st; v <= hi + 1e-9; v += st) o.push(+v.toFixed(6)); return o;
+}
+const PAD = { l: 48, r: 10, t: 10, b: 30 };
+function axes(ctx, w, h, x0, x1, y0, y1, xl, yl, bands) {
+  const X = v => PAD.l + (v - x0) / (x1 - x0) * (w - PAD.l - PAD.r), Y = v => h - PAD.b - (v - y0) / (y1 - y0) * (h - PAD.t - PAD.b);
+  const fg = getComputedStyle(document.body).color;
+  if (bands) { ctx.globalAlpha = 0.16; let a = 0; for (let i = 1; i <= S.t.length; i++) if (i === S.t.length || S.phase[i] !== S.phase[a]) { if (S.phase[a] !== 'SS') { ctx.fillStyle = css('--ph-' + phKey(S.phase[a])); ctx.fillRect(X(S.t[a]), PAD.t, X(S.t[Math.min(i, S.t.length - 1)]) - X(S.t[a]), h - PAD.t - PAD.b); } a = i; } ctx.globalAlpha = 1; }
+  ctx.font = '11px ui-monospace, monospace'; ctx.fillStyle = fg; ctx.lineWidth = 1; ctx.strokeStyle = css('--line');
+  const xt = ticks(x0, x1, Math.max(3, Math.floor(w / 70))), yt = ticks(y0, y1, 5);
+  ctx.globalAlpha = 0.3; for (const v of xt) { ctx.beginPath(); ctx.moveTo(X(v), PAD.t); ctx.lineTo(X(v), h - PAD.b); ctx.stroke(); } for (const v of yt) { ctx.beginPath(); ctx.moveTo(PAD.l, Y(v)); ctx.lineTo(w - PAD.r, Y(v)); ctx.stroke(); }
+  ctx.globalAlpha = 1; ctx.strokeRect(PAD.l + .5, PAD.t + .5, w - PAD.l - PAD.r - 1, h - PAD.t - PAD.b - 1);
+  ctx.textAlign = 'center'; for (const v of xt) ctx.fillText(String(+v.toFixed(3)), X(v), h - PAD.b + 13);
+  ctx.textAlign = 'right'; for (const v of yt) ctx.fillText(String(+v.toFixed(3)), PAD.l - 4, Y(v) + 4);
+  ctx.fillText(xl, w - PAD.r, h - 3); if (yl) { ctx.textAlign = 'left'; ctx.fillText(yl, PAD.l + 5, PAD.t + 13); }
+  return [X, Y, fg];
+}
+function line(ctx, X, Y, fx, fy, col, w, dash, to) {
+  ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath(); let pen = false;
+  for (let i = 0; i <= to; i++) { const y = fy(i), x = fx(i); if (y == null || x == null) { pen = false; continue; } if (pen) ctx.lineTo(X(x), Y(y)); else { ctx.moveTo(X(x), Y(y)); pen = true; } }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+const STY = () => [[css('--s1'), 1.8, []], [css('--s2'), 1.2, [5, 3]]];
+function drawTime(c) {
+  const [ctx, w, h] = setup(c), sig = $('sig').value, [label, series, zero] = SIGNALS[sig], n = S.t.length;
+  let y0 = Infinity, y1 = -Infinity;
+  for (const [, f] of series) for (let i = 0; i < n; i += 2) { const v = f(i); if (v != null) { y0 = Math.min(y0, v); y1 = Math.max(y1, v); } }
+  if (zero) { y0 = Math.min(y0, -0.02); y1 = Math.max(y1, 0.02); }
+  const m = (y1 - y0) * 0.06 || 0.1; y0 -= m; y1 += m;
+  const lr = loopRange(), [X, Y, fg] = axes(ctx, w, h, T0, T1, y0, y1, 't (s) · shading = change-over phases', null, true), sty = STY();
+  if (zero) { ctx.strokeStyle = fg; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(PAD.l, Y(0)); ctx.lineTo(w - PAD.r, Y(0)); ctx.stroke(); ctx.setLineDash([]); ctx.textAlign = 'left'; ctx.fillText('outside ↓  inside ↑', PAD.l + 5, Y(0) - 4); }
+  if (lr) { ctx.strokeStyle = fg; ctx.setLineDash([2, 2]); for (const t of lr) { ctx.beginPath(); ctx.moveTo(X(t), PAD.t); ctx.lineTo(X(t), h - PAD.b); ctx.stroke(); } ctx.setLineDash([]); }
+  series.forEach(([, f], k) => line(ctx, X, Y, i => S.t[i], f, sty[k][0], sty[k][1], sty[k][2], n - 1));
+  ctx.strokeStyle = fg; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(cur), PAD.t); ctx.lineTo(X(cur), h - PAD.b); ctx.stroke();
+  c.setAttribute('aria-label', `${label} against time, cursor at ${cur.toFixed(2)} s`);
+  $('key').innerHTML = series.map(([nm], k) => `<span><svg width="22" height="6" aria-hidden="true"><path d="M0 3H22" style="stroke:var(--s${k + 1})" stroke-width="${k ? 1.5 : 2}"${k ? ' stroke-dasharray="4 2"' : ''}/></svg> ${nm}</span>`).join('');
+}
+function drawPlan(c, i) {
+  const [ctx, w, h] = setup(c);
+  const xs = S.com.map(v => v[0]), x0 = Math.min(...xs) - 0.25, x1 = Math.max(...xs) + 0.25, yr = Math.max(0.3, (x1 - x0) * (h - PAD.t - PAD.b) / (w - PAD.l - PAD.r) / 2);
+  const [X, Y, fg] = axes(ctx, w, h, x0, x1, -yr, yr, 'x (m)', 'y (m)'), sty = STY();
+  ctx.strokeStyle = fg; for (const p of prints) if (p[3] <= S.t[i]) ctx.strokeRect(X(p[0] - 0.14), Y(p[1] + 0.07), X(p[0] + 0.14) - X(p[0] - 0.14), Y(p[1] - 0.07) - Y(p[1] + 0.07));
+  line(ctx, X, Y, j => S.zmp[j] && S.zmp[j][0], j => S.zmp[j] && S.zmp[j][1], sty[1][0], 1, sty[1][2], i);
+  line(ctx, X, Y, j => S.com[j][0], j => S.com[j][1], sty[0][0], 1.8, [], i);
+  ctx.fillStyle = sty[0][0]; ctx.beginPath(); ctx.arc(X(S.com[i][0]), Y(S.com[i][1]), 3.5, 0, 7); ctx.fill();
+  c.setAttribute('aria-label', 'Plan view of footprints, CoM path and ZMP path up to the cursor');
+  $('key').innerHTML = `<span style="color:var(--s1)">— CoM</span><span style="color:var(--s2)">- - ZMP</span><span>□ footprints</span>`;
+}
+function drawPhase(c, i) {
+  const [ctx, w, h] = setup(c);
+  const all = coRuns.flatMap(r => r.pts.map(p => [S.com[p[0]][0] - S.com[r.i0][0], p[1]])); if (!all.length) return;
+  const x1 = Math.max(0.3, ...all.map(a => a[0])) + 0.02, v1 = Math.max(0.6, ...all.map(a => a[1])) + 0.1, v0 = Math.min(0, ...all.map(a => a[1]));
+  const [X, Y] = axes(ctx, w, h, 0, x1, v0, v1, 'CoM advance since start of A (m)', 'CoM forward speed (m/s)');
+  for (const r of coRuns) for (let k = 1; k < r.pts.length; k++) {
+    const [ii, v, ph] = r.pts[k]; if (ii > i) break; const [ip, vp] = r.pts[k - 1];
+    ctx.strokeStyle = css('--ph-' + phKey(ph)); ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(X(S.com[ip][0] - S.com[r.i0][0]), Y(vp)); ctx.lineTo(X(S.com[ii][0] - S.com[r.i0][0]), Y(v)); ctx.stroke();
+  }
+  c.setAttribute('aria-label', 'Change-over phase plane up to the cursor, one trace per change-over, coloured by phase');
+  $('key').innerHTML = '<span>one trace per change-over, coloured by phase</span>';
+}
+function drawChart() {
+  if (!S) return; const c = $('chart'), i = idxAt(cur);
+  $('sigWrap').hidden = tab !== 'time';
+  if (tab === 'time') drawTime(c); else if (tab === 'plan') drawPlan(c, i); else drawPhase(c, i);
+}
+function drawSupport(i) {
+  const c = $('cSup'), [ctx, w, h] = setup(c), fr = F[frameAt(cur)].p, fg = getComputedStyle(document.body).color;
+  const feet = ['L', 'R'].filter(s => FOOT[s]).map(s => [s, FOOT[s], bodyPose(fr, FOOT[s].body)[0]]);
+  if (!feet.length) return;
+  const cx = feet.reduce((a, f) => a + f[2][0], 0) / feet.length, cy = feet.reduce((a, f) => a + f[2][1], 0) / feet.length;
+  const sc = Math.min(w / 0.95, h / 0.62), X = x => w / 2 + (x - cx) * sc, Y = y => h / 2 - (y - cy) * sc;
+  ctx.font = '11px ui-monospace, monospace'; ctx.textAlign = 'center';
+  const sw = S.sw[i];
+  for (const [s, g] of feet) {   // sole outline from the foot box, at sole height
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => geomWorld(fr, g, [a * g.size[0], b * g.size[1], 0]));
+    ctx.strokeStyle = fg; ctx.lineWidth = 1; ctx.beginPath(); corners.forEach((p, k) => k ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.closePath(); ctx.stroke();
+    const mid = corners.reduce((a, p) => [a[0] + p[0] / 4, a[1] + p[1] / 4], [0, 0]); ctx.fillStyle = fg; ctx.fillText(s, X(mid[0]), Y(mid[1]) + 4);
+  }
+  const hl = HULL[i];
+  if (hl.length >= 2) { ctx.fillStyle = css('--sup'); ctx.strokeStyle = css('--sup'); ctx.globalAlpha = 0.22; ctx.beginPath(); hl.forEach((p, k) => k ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.stroke(); }
+  for (const s of SPK) {
+    const p = geomWorld(fr, s.g, [0, 0, 0]), on = sw[s.k] === '1';
+    ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 5, 0, 7); ctx.lineWidth = 1.5; ctx.strokeStyle = fg; ctx.fillStyle = on ? css('--sup') : 'transparent';
+    if (on) ctx.fill(); ctx.stroke();
+  }
+  const c3 = S.com[i]; ctx.strokeStyle = css('--com'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(c3[0]) - 6, Y(c3[1])); ctx.lineTo(X(c3[0]) + 6, Y(c3[1])); ctx.moveTo(X(c3[0]), Y(c3[1]) - 6); ctx.lineTo(X(c3[0]), Y(c3[1]) + 6); ctx.stroke();
+  const z = S.zmp[i]; if (z) { ctx.fillStyle = css('--zmp'); ctx.beginPath(); ctx.moveTo(X(z[0]), Y(z[1]) - 6); ctx.lineTo(X(z[0]) + 6, Y(z[1])); ctx.lineTo(X(z[0]), Y(z[1]) + 6); ctx.lineTo(X(z[0]) - 6, Y(z[1])); ctx.closePath(); ctx.fill(); }
+  ctx.textAlign = 'left'; ctx.fillStyle = fg; ctx.fillText('10 cm', 8, h - 8); ctx.strokeStyle = fg; ctx.beginPath(); ctx.moveTo(52, h - 12); ctx.lineTo(52 + 0.1 * sc, h - 12); ctx.stroke();
+  const on = s => [...(s === 'L' ? sw.slice(0, 4) : sw.slice(4))].filter(x => x === '1').length, m = MARGIN[i], n = hl.length;
+  const desc = m == null ? '— (no ZMP or no contact)'
+    : n < 3 ? `<b>0 mm</b>: only ${n} spike${n > 1 ? 's' : ''} on, so the support is a ${n > 1 ? 'line' : 'point'} (ZMP ${Math.abs(m) < 0.0005 ? 'on it' : mm(Math.abs(m)) + ' off it'})`
+    : Math.abs(m) < 0.0005 ? '<b>0 mm</b>: ZMP on the polygon edge' : `<b>${mm(m)}</b> ${m > 0 ? 'inside' : 'outside'} the polygon`;
+  $('supText').innerHTML = `spikes on: L ${on('L')}/4, R ${on('R')}/4<br>ZMP margin: ${desc}`;
+  c.setAttribute('aria-label', `Top view of both soles. Left ${on('L')} of 4 spikes loaded, right ${on('R')} of 4. ZMP margin ${mm(m)}.`);
+}
+function seekFrom(el, e) { const r = el.getBoundingClientRect(), l = el.tagName === 'CANVAS' ? PAD.l : 0, rr = el.tagName === 'CANVAS' ? PAD.r : 0; cur = clamp(T0 + (e.clientX - r.left - l) / (r.width - l - rr) * (T1 - T0)); playing = false; syncPlay(); update(); }
+for (const el of [$('chart'), $('strip')]) {
+  let drag = false;
+  el.addEventListener('pointerdown', e => { if (el.id === 'chart' && tab !== 'time') return; drag = true; el.setPointerCapture(e.pointerId); seekFrom(el, e); });
+  el.addEventListener('pointermove', e => { if (drag) seekFrom(el, e); });
+  el.addEventListener('pointerup', () => drag = false);
+}
+
+// ---------- per-frame update
+let tick = 0;
+function update() {
+  if (!S) return;
+  const i = idxAt(cur), fr = F[frameAt(cur)].p;
+  for (let b = 0; b < bodies.length; b++) { const o = b * 7; bodies[b].position.set(fr[o], fr[o + 1], fr[o + 2]); bodies[b].quaternion.set(fr[o + 4], fr[o + 5], fr[o + 6], fr[o + 3]); }
+  const c = S.com[i], z = S.zmp[i];
+  comMark.position.set(c[0], c[1], c[2]); comDrop.position.set(c[0], c[1], c[2] / 2); comDrop.scale.set(1, c[2], 1);
+  comMark.visible = comDrop.visible = show.com; zmpMark.visible = show.zmp && !!z; if (z) zmpMark.position.set(z[0], z[1], 0.025);
+  comTrail.visible = show.com && show.trails; zmpTrail.visible = show.zmp && show.trails; printGroup.visible = show.prints;
+  comTrail.geometry.setDrawRange(0, i >> 1); zmpTrail.geometry.setDrawRange(0, i >> 1);
+  printGroup.children.forEach(l => l.visible = l.userData.t <= S.t[i]);
+  supLine.visible = show.sup && HULL[i].length >= 2; setSupport(HULL[i]);
+  if (view === 'follow' || view === 'top') { const dx = S.pelvis[i][0] - controls.target.x; controls.target.x += dx; camera.position.x += dx; }
+
+  const ph = S.phase[i], inPh = S.t[i] - S.t[phStart[i]], co = 'ABCD'.includes(ph) && ph.length === 1;
+  const aEv = RUN.events.filter(e => e[1].startsWith('A_') && e[0] <= cur + 1e-6), nCO = RUN.events.filter(e => e[1].startsWith('A_')).length;
+  const lastA = aEv[aEv.length - 1], front = lastA && lastA[1].split('->')[1], rear = lastA && lastA[1][2];
+  const sw = S.sw[i], on = s => [...(s === 'L' ? sw.slice(0, 4) : sw.slice(4))].filter(x => x === '1').length;
+  const where = co ? `change-over ${aEv.length}/${nCO}, ${rear} → ${front}` : ph === 'SS' ? `on ${on('L') >= on('R') ? 'L' : 'R'}` : '';
+  $('hudL').innerHTML = `<b>${PHNAME[ph] || ph}</b> ${where}`;
+  $('hudR').textContent = `t ${cur.toFixed(3)} s · ${$('speed').value}×`;
+  $('phBig').textContent = ph.length <= 2 ? ph : '—';
+  $('phText').textContent = `${PHNAME[ph] || ph} for ${inPh.toFixed(3)} s${co ? ' · ' + where : ''}`;
+  let why = PHWHY[ph] || '';
+  if (ph === 'D') why += ` Ends when the front ankle reaches its angle (not in run.json), its roll matches and all 4 front spikes are on (now ${on(front)}/4), or at the ${RUN.design && RUN.design.D_max ? RUN.design.D_max.toFixed(2) + ' s ' : ''}time-out (now ${inPh.toFixed(2)} s).`;
+  $('phWhy').textContent = why;
+  const t3 = v => v.map(x => x.toFixed(3)).join(' ');
+  $('readout').innerHTML = [['CoM x y z (m)', t3(c)], ['ZMP x y (m)', z ? t3(z) : 'airborne'], ['pelvis x y z (m)', t3(S.pelvis[i])],
+    ['ankle pitch L R (°)', fmtA(S.q[i][J.L_ankle_pitch]) + ' ' + fmtA(S.q[i][J.R_ankle_pitch])], ['ankle τ pitch L R', S.tau_ankle[i][0].toFixed(0) + ' ' + S.tau_ankle[i][2].toFixed(0) + ' N·m'],
+    ['ankle τ roll L R', S.tau_ankle[i][1].toFixed(0) + ' ' + S.tau_ankle[i][3].toFixed(0) + ' N·m']].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  for (const n of ['hip_roll', 'hip_pitch', 'hip_yaw', 'knee', 'ankle_pitch', 'ankle_roll']) for (const s of 'LR') $(`j${s}_${n}`).textContent = fmtA(S.q[i][J[`${s}_${n}`]]);
+  const f = (cur - T0) / (T1 - T0);
+  $('scrub').value = Math.round(f * 10000); $('clock').textContent = cur.toFixed(3) + ' s'; $('stripCur').style.left = f * 100 + '%';
+  drawSupport(i);
+  if (!playing || ++tick % 3 === 0) drawChart();
+}
+
+// ---------- controls
+function syncPlay() { $('play').textContent = playing ? 'Pause' : 'Play'; }
+function cmd(c, arg) {
+  if (c === 'play') { playing = !playing; if (playing && cur >= T1) cur = T0; last = null; syncPlay(); }
+  else if (c === 'start') { cur = T0; update(); } else if (c === 'end') { cur = T1; update(); }
+  else if (c === 'step') { playing = false; syncPlay(); cur = clamp(cur + arg * 0.01); update(); }
+  else if (c === 'event') {
+    playing = false; syncPlay(); const ts = RUN.events.map(e => e[0]);
+    const t = arg > 0 ? ts.find(x => x > cur + 1e-4) : [...ts].reverse().find(x => x < cur - 1e-4);
+    cur = t != null ? t : arg > 0 ? T1 : T0; update();
+  } else if (c === 'cam') setView(arg);
+}
+document.querySelectorAll('button[data-cmd]').forEach(b => b.onclick = () => cmd(b.dataset.cmd, +b.dataset.arg || 0));
+$('scrub').oninput = () => { cur = T0 + $('scrub').value / 10000 * (T1 - T0); playing = false; syncPlay(); update(); };
+$('cam').onchange = e => setView(e.target.value);
+$('sig').onchange = drawChart; $('loop').onchange = drawChart; $('speed').onchange = update;
+document.querySelectorAll('[data-show]').forEach(c => c.onchange = () => { show[c.dataset.show] = c.checked; update(); });
+document.querySelectorAll('[role=tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; document.querySelectorAll('[role=tab]').forEach(x => x.setAttribute('aria-selected', String(x === b))); drawChart(); });
+document.addEventListener('keydown', e => {
+  const t = e.target, tag = t.tagName;
+  if (e.ctrlKey || e.metaKey || e.altKey || tag === 'SELECT' || (tag === 'INPUT' && t.type !== 'checkbox' && !(t.type === 'range' && !e.key.startsWith('Arrow')))) return;
+  const map = { ' ': ['play'], ArrowLeft: ['step', e.shiftKey ? -10 : -1], ArrowRight: ['step', e.shiftKey ? 10 : 1], '[': ['event', -1], ']': ['event', 1], Home: ['start'], End: ['end'], 1: ['cam', 'follow'], 2: ['cam', 'side'], 3: ['cam', 'front'], 4: ['cam', 'top'] };
+  const m = map[e.key]; if (!m || (e.key === ' ' && tag === 'BUTTON')) return;
+  e.preventDefault(); cmd(m[0], m[1]);
+});
+$('fileIn').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(x => { load(JSON.parse(x)); document.title = 'WL-10RD replay: ' + f.name; })
+    .catch(err => { $('summary').textContent = `Could not open ${f.name}: ${err.message}`; });
+};
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (RUN) { buildScene(); update(); drawChart(); } });
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { drawChart(); if (S) drawSupport(idxAt(cur)); }, 100); });
+function loop(ts) {
+  if (playing && S) {
+    if (last != null) {
+      const lr = loopRange();   // from the position before this frame's advance
+      cur += (ts - last) / 1000 * parseFloat($('speed').value);
+      if (lr && cur >= lr[1]) cur = lr[0];
+      else if (cur >= T1) { cur = T1; playing = false; syncPlay(); }
+      update();
+    }
+    last = ts;
+  } else last = null;
+  controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop);
+}
+function load(run) {
+  if (!run || !run.series || !run.frames || !run.geoms) throw new Error('not a run.json from run_walk (missing series, frames or geoms)');
+  RUN = run; S = run.series; F = run.frames; T0 = S.t[0]; T1 = S.t[S.t.length - 1];
+  derive(); buildStatic(); buildScene();
+  const a = RUN.events.find(e => e[1].startsWith('A_')); cur = a ? a[0] + 0.12 : T0; playing = false; syncPlay();
+  resize(); setView(view); drawChart();
+}
+try { load(JSON.parse($('run-data').textContent)); }
+catch (err) { $('summary').textContent = 'No run embedded. Choose a run.json written by python -m wl10rd_sim.run_walk.'; console.error(err); }
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

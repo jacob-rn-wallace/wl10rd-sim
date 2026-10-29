@@ -6,6 +6,8 @@
 Writes  <out>/run.json      (time series, body poses, events)
         <out>/viewer.html   (self-contained 3D replay + charts; open in a browser)
         <out>/viewer_motif.html (the same replay in a CDE/Motif-style workspace; prototype)
+        <out>/viewer_min.html   (the same replay with plain controls; base for the redesign)
+        <out>/viewer_sketch.html (renderer prototype: black-and-white hatched illustration style)
         <out>/plots/*.pdf|png (paper-style figures)
 """
 import argparse
@@ -40,6 +42,8 @@ def main():
     run = run_to_json(w, p, fps=50, title='WL-10RD simulation')
     build_viewer(p, os.path.join(a.out, 'viewer.html'))
     build_viewer(p, os.path.join(a.out, 'viewer_motif.html'), 'viewer_motif_template.html')
+    build_viewer(p, os.path.join(a.out, 'viewer_min.html'), 'viewer_min_template.html')
+    build_viewer(p, os.path.join(a.out, 'viewer_sketch.html'), 'viewer_sketch_template.html')
     print(plots.plot_all(run, os.path.join(a.out, 'plots')))
     print('events:', [(round(t, 2), e) for t, e in w.events])
 
